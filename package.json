@@ -1,0 +1,43 @@
+{
+  "author": {
+    "name": "Harry Lee",
+    "email": "lephamhungcuong219@gmail.com",
+    "url": "https://github.com/ticuong78"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "dom-sentinel": "dist/cli/index.js"
+  },
+  "description": "Monitors DOM structure changes on target websites to protect web scraping pipelines from breaking silently.",
+  "keywords": [
+    "dom",
+    "web-scraping",
+    "monitoring",
+    "change-detaction",
+    "playwright",
+    "developer-tools",
+    "scraper",
+    "crawler"
+  ],
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.6.0",
+    "jest": "^30.3.0",
+    "ts-jest": "^29.4.9",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "playwright": "^1.59.1",
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "test": "jest"
+  }
+}
