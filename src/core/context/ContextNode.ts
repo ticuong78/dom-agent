@@ -1,3 +1,17 @@
+export type ValueType = {
+  numberOfValue: number; // number of values seperated by commas and white space
+  totalLength: number; // total length of the value in string
+};
+
+// have most weight: depth, height, nthChild (its potision in the generation), tagName
+
+// logic - structural change:
+// traverse down to the specific depth of the node, get the node - call node A
+
+// from the deepest generation, traverse up, get the node - call node B
+
+// if A has same signature as B => legit, unchanged
+
 export type ContextNode = {
   // identity
   id: string; // generated unique id at snapshot time

@@ -61,15 +61,17 @@ export class HTMLToContextConverter {
             .join("") + currentNode.directText,
     );
 
-    const contextSignature = this.hasher.hash(
-      nodeSignature +
-        innerNodeSignature +
-        depth +
-        height +
-        childNodes.length +
-        currentNode.siblingCount +
-        currentNode.nthChild,
-    );
+    const contextSignature =
+      depth.toString() +
+      "_" +
+      this.hasher.hash(
+        nodeSignature +
+          innerNodeSignature +
+          height +
+          childNodes.length +
+          currentNode.siblingCount +
+          currentNode.nthChild,
+      );
 
     const contextNode: ContextNode = {
       id,
