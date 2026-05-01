@@ -1,69 +1,67 @@
-import type { ContextNode } from "./ContextNode";
+import type { ContextNode } from "../atoms";
 
 export class ContextTree {
   private root: ContextNode;
-  private index: Map<string, ContextNode>; // contextSignature -> ContextNode
+
+  private byContext: Map<string, ContextNode> = new Map();
+  private byNode: Map<string, ContextNode[]> = new Map();
+  private byInner: Map<string, ContextNode[]> = new Map();
 
   constructor(root: ContextNode) {
     this.root = root;
-    this.index = new Map();
-    this.buildIndex(root);
+    this.walk(root);
   }
 
-  // build flat index on construction — O(n) once, O(1) lookup forever
-  private buildIndex(node: ContextNode): void {
-    this.index.set(node.contextSignature, node);
-    for (const child of node.children) {
-      this.buildIndex(child);
-    }
-  }
+  private walk(node: ContextNode): void {
+    // primary — unique per node (vị trí + bề mặt + subtree)
+    this.byContext.set(node.contextSignature, node);
 
-  // --- getters ---
+    // secondary — có thể trùng, nhiều node cùng tag/attrs/text
+    const nodeGroup = this.byNode.get(node.nodeSignature) ?? [];
+    nodeGroup.push(node);
+    this.byNode.set(node.nodeSignature, nodeGroup);
+
+    // tertiary — có thể trùng, nhiều node cùng cấu trúc subtree
+    const innerGroup = this.byInner.get(node.innerSignature) ?? [];
+    innerGroup.push(node);
+    this.byInner.set(node.innerSignature, innerGroup);
+
+    node.children.forEach((child) => this.walk(child));
+  }
 
   getRoot(): ContextNode {
     return this.root;
   }
 
-  getBySignature(contextSignature: string): ContextNode | undefined {
-    return this.index.get(contextSignature);
+  getByContext(sig: string): ContextNode | undefined {
+    return this.byContext.get(sig);
   }
 
-  getById(id: string): ContextNode | undefined {
-    for (const node of this.index.values()) {
-      if (node.id === id) return node;
-    }
-    return undefined;
+  getByNode(sig: string): ContextNode[] {
+    return this.byNode.get(sig) ?? [];
   }
 
-  has(contextSignature: string): boolean {
-    return this.index.has(contextSignature);
+  getByInner(sig: string): ContextNode[] {
+    return this.byInner.get(sig) ?? [];
+  }
+
+  hasContext(sig: string): boolean {
+    return this.byContext.has(sig);
+  }
+
+  hasNode(sig: string): boolean {
+    return this.byNode.has(sig);
+  }
+
+  hasInner(sig: string): boolean {
+    return this.byInner.has(sig);
+  }
+
+  contextSignatures(): Set<string> {
+    return new Set(this.byContext.keys());
   }
 
   size(): number {
-    return this.index.size;
-  }
-
-  // --- traversal ---
-
-  // walk every node in DFS order, call callback on each
-  walk(callback: (node: ContextNode) => void): void {
-    this.walkNode(this.root, callback);
-  }
-
-  private walkNode(
-    node: ContextNode,
-    callback: (node: ContextNode) => void,
-  ): void {
-    callback(node);
-    for (const child of node.children) {
-      this.walkNode(child, callback);
-    }
-  }
-
-  // --- comparison helpers ---
-
-  // returns all signatures in this tree — used for diffing against another tree
-  signatures(): Set<string> {
-    return new Set(this.index.keys());
+    return this.byContext.size;
   }
 }
