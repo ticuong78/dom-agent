@@ -32,6 +32,8 @@ export type ContextNode = {
   // format: "<depth>:<nthChild>/<siblingCount>|<nodeSignature>|<innerNodeSignature>"
   contextSignature: string;
 
+  structuralSignature: string;
+
   capturedAt: Date;
 };
 

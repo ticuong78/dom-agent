@@ -103,5 +103,5 @@ const diffPoints = diffViewer.highlight(treeV1!, treeV2!);
 
 const diffReporter = new HTMLDiffReporter();
 
-console.dir(diffPoints);
+// console.dir(diffPoints);
 diffReporter.report(diffPoints);

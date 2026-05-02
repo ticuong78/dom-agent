@@ -53,8 +53,7 @@ export class HTMLToContextConverter {
     const nodeSignature = [
       currentNode.tagName,
       Object.keys(attributeFingerprints).length,
-      attrPairs,
-      currentNode.directText.length,
+      attrPairs, // HERE — thay thế sortedAttrKeys
     ].join("|");
 
     // DFS — recurse vào children, truyền nodeSignature hiện tại làm parent
@@ -78,13 +77,14 @@ export class HTMLToContextConverter {
       )
       .slice(0, 12);
 
-    // HERE — fix 1: contextSignature giờ bao gồm parentNodeSignature
-    // "tôi là ai" + "tôi nằm dưới node nào" + "nội dung tôi là gì"
-    // cousin trong parents-side vs cousin trong extended-family
-    // sẽ có parentNodeSignature khác nhau → contextSignature khác → detect RELOCATED
+    const structuralSignature = [
+      currentNode.tagName,
+      Object.keys(attributeFingerprints).length,
+    ].join("|");
+
+    // HERE — contextSignature is now computed (was empty string "")
     const contextSignature = [
-      `${depth}`,
-      parentNodeSignature,
+      `${depth}:${currentNode.nthChild}/${currentNode.siblingCount}`,
       nodeSignature,
       innerSignature,
     ].join("|");
@@ -97,6 +97,7 @@ export class HTMLToContextConverter {
       directText: currentNode.directText,
       depth,
       height,
+      structuralSignature,
       childCount: childNodes.length,
       siblingCount: currentNode.siblingCount,
       nthChild: currentNode.nthChild,
