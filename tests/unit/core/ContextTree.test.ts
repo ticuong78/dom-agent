@@ -2,7 +2,7 @@ import { CheerioAdapter } from "@adapters/atom";
 import { SHA256HashAdapter } from "@adapters/hash";
 import { UUIDAdapter } from "@adapters/id";
 import type { ContextTree } from "@core/context";
-import { HTMLToContextConverter } from "@implementation/HTMLToContextConverter";
+import { HTMLToContextConverter } from "@implementation/converter/HTMLToContextConverter";
 
 const html = `
 <!DOCTYPE html>
@@ -91,7 +91,7 @@ describe("ContextTree", () => {
 
     // same html = same signatures
     expect(root.nodeSignature).toBe(tree2.getRoot().nodeSignature);
-    expect(root.innerNodeSignature).toBe(tree2.getRoot().innerNodeSignature);
+    expect(root.innerSignature).toBe(tree2.getRoot().innerSignature);
     expect(root.contextSignature).toBe(tree2.getRoot().contextSignature);
   });
 

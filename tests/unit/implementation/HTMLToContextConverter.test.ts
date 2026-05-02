@@ -1,4 +1,4 @@
-import { HTMLToContextConverter } from "@implementation/HTMLToContextConverter";
+import { HTMLToContextConverter } from "@implementation/converter/HTMLToContextConverter";
 import { SHA256HashAdapter } from "@adapters/hash/SHA256HashAdapter";
 import { UUIDAdapter } from "@adapters/id/UUIDAdapter";
 import type { HTMLNode } from "@core/plain/HTMLNode";
@@ -204,11 +204,11 @@ describe("HTMLToContextConverter", () => {
       expect(result1.nodeSignature).toBe(result2.nodeSignature);
     });
 
-    test("innerNodeSignature is deterministic", () => {
+    test("innerSignature is deterministic", () => {
       const node = makeNode({ children: [makeNode({ tagName: "span" })] });
       const result1 = converter.convert(node)!.getRoot();
       const result2 = converter.convert(node)!.getRoot();
-      expect(result1.innerNodeSignature).toBe(result2.innerNodeSignature);
+      expect(result1.innerSignature).toBe(result2.innerSignature);
     });
 
     test("contextSignature is deterministic", () => {
@@ -252,10 +252,10 @@ describe("HTMLToContextConverter", () => {
       expect(root.contextSignature).not.toBe(child.contextSignature);
     });
 
-    test("leaf node innerNodeSignature uses directText", () => {
+    test("leaf node innerSignature uses directText", () => {
       const a = converter.convert(makeNode({ directText: "hello" }))!.getRoot();
       const b = converter.convert(makeNode({ directText: "world" }))!.getRoot();
-      expect(a.innerNodeSignature).not.toBe(b.innerNodeSignature);
+      expect(a.innerSignature).not.toBe(b.innerSignature);
     });
   });
 

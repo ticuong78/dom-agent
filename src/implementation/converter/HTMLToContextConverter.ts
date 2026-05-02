@@ -18,29 +18,20 @@ export class HTMLToContextConverter {
   }
 
   convert(currentNode: HTMLNode, depth: number = 0) {
-    const root = this._convert(currentNode, depth);
-
+    const root = this._convert(currentNode, depth, "root");
     return root ? new ContextTree(root) : null;
   }
 
   private _convert(
     currentNode: HTMLNode,
     depth: number = 0,
+    parentNodeSignature: string = "root", // HERE — fix 1: biết mình nằm dưới node nào
   ): ContextNode | null {
     if (currentNode.type !== "tag") return null;
 
     const id = this.idGenerator.generate();
 
-    const childNodes: ContextNode[] = currentNode.children
-      .map((child) => this._convert(child, depth + 1))
-      .filter((n): n is ContextNode => n !== null);
-
-    const height =
-      childNodes.length === 0
-        ? 0
-        : Math.max(...childNodes.map((c) => c.height)) + 1;
-
-    // HERE — build attributeFingerprints instead of storing raw attribute values
+    // build attributeFingerprints
     const attributeFingerprints: Record<string, ValueType> = Object.fromEntries(
       Object.entries(currentNode.attributes).map(([key, value]) => [
         key,
@@ -56,13 +47,28 @@ export class HTMLToContextConverter {
       .sort()
       .join(",");
 
+    // HERE — nodeSignature tính TRƯỚC khi recurse vào children
+    // vì nó không phụ thuộc children, chỉ phụ thuộc bề mặt node
+    // nhờ đó có thể truyền xuống làm parentNodeSignature cho children
     const nodeSignature = [
       currentNode.tagName,
       Object.keys(attributeFingerprints).length,
-      attrPairs, // HERE — thay thế sortedAttrKeys
+      attrPairs,
       currentNode.directText.length,
     ].join("|");
 
+    // DFS — recurse vào children, truyền nodeSignature hiện tại làm parent
+    const childNodes: ContextNode[] = currentNode.children
+      .map((child) => this._convert(child, depth + 1, nodeSignature)) // HERE
+      .filter((n): n is ContextNode => n !== null);
+
+    // backtrack — height chỉ tính được sau khi children xong
+    const height =
+      childNodes.length === 0
+        ? 0
+        : Math.max(...childNodes.map((c) => c.height)) + 1;
+
+    // innerSignature — hash 12 chars, tích lũy đệ quy từ children
     const innerSignature = this.hasher
       .hash(
         childNodes.length === 0
@@ -72,9 +78,13 @@ export class HTMLToContextConverter {
       )
       .slice(0, 12);
 
-    // HERE — contextSignature is now computed (was empty string "")
+    // HERE — fix 1: contextSignature giờ bao gồm parentNodeSignature
+    // "tôi là ai" + "tôi nằm dưới node nào" + "nội dung tôi là gì"
+    // cousin trong parents-side vs cousin trong extended-family
+    // sẽ có parentNodeSignature khác nhau → contextSignature khác → detect RELOCATED
     const contextSignature = [
-      `${depth}:${currentNode.nthChild}/${currentNode.siblingCount}`,
+      `${depth}`,
+      parentNodeSignature,
       nodeSignature,
       innerSignature,
     ].join("|");
