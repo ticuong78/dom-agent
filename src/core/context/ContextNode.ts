@@ -7,6 +7,7 @@ export type ContextNode = {
   id: string;
 
   tagName: string;
+  attribute: Record<string, string>;
   attributeFingerprints: Record<string, ValueType>; // shape, not content
   attributeCount: number;
   directText: string; // cần cho nodeSignature + diff reporting
@@ -22,19 +23,22 @@ export type ContextNode = {
   previousSibling: ContextNode | null;
   children: ContextNode[];
 
-  // format: "<tagName>|<attributeCount>|<sortedAttrKeys>|<directTextLen>"
+  // Surface — node tự nó là gì.
+  // format: "<tagName>|<attrCount>|<attrShapesSortedByAttrName>"
+  // mỗi attribute encode thành "<numberOfValues>:<totalLength>"; tên attr
+  // chỉ dùng để sort, không xuất hiện trong chuỗi cuối.
   nodeSignature: string;
 
-  // innerNodeSignature — vẫn hash (tích lũy đệ quy), cắt ngắn 12 chars
+  // Subtree — nội dung con cháu + directText, hash đệ quy 12 ký tự.
   innerSignature: string;
 
-  // contextSignature — readable composite, parseable hoàn toàn
-  // format: "<depth>:<nthChild>/<siblingCount>|<nodeSignature>|<innerNodeSignature>"
-  contextSignature: string;
+  // Position — chỗ đứng của node trong cây.
+  // format: "<depth>:<nthChild>/<siblingCount>"
+  positioningSignature: string;
 
-  structuralSignature: string;
+  parentSignature: string | null;
 
-  capturedAt: Date;
+  // capturedAt: Date; // bỏ, nên để khi tree tạo snapshot thì lưu
 };
 
 export class ContextNodeSerializer {

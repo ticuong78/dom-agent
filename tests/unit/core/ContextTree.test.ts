@@ -44,7 +44,7 @@ describe("ContextTree", () => {
 
   test("root node is generation_one", () => {
     expect(tree.getRoot().tagName).toBe("div");
-    expect(tree.getRoot().attributes["class"]).toBe("generation_one");
+    expect(tree.getRoot().attribute["class"]).toBe("generation_one");
   });
 
   test("root depth is 0", () => {
@@ -66,7 +66,7 @@ describe("ContextTree", () => {
   test("child parent points back to root", () => {
     const child = tree.getRoot().children[0];
     expect(child?.parent?.tagName).toBe("div");
-    expect(child?.parent?.attributes["id"]).toBe("grandparents");
+    expect(child?.parent?.attribute["id"]).toBe("grandparents");
   });
 
   test("siblings are linked correctly", () => {

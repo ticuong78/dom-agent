@@ -11,7 +11,7 @@ export class HTMLDiffReporter implements DiffReporter {
     this.outputPath = outputPath;
   }
 
-  report(diffPoints: DiffPoint[]): void {
+  report(diffPoints: DiffPoint<string>[]): void {
     const html = this.render(diffPoints);
     const dir = path.dirname(this.outputPath);
 
@@ -20,10 +20,10 @@ export class HTMLDiffReporter implements DiffReporter {
     }
 
     fs.writeFileSync(this.outputPath, html, "utf-8");
-    console.log(`[dom-agent] report written → ${this.outputPath}`);
+    console.log(`[dom-agent] report written -> ${this.outputPath}`);
   }
 
-  private render(diffPoints: DiffPoint[]): string {
+  private render(diffPoints: DiffPoint<string>[]): string {
     const counts = this.counts(diffPoints);
     const cards = diffPoints.map((p) => this.card(p)).join("\n");
     const timestamp = new Date().toISOString();
@@ -33,7 +33,7 @@ export class HTMLDiffReporter implements DiffReporter {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DOM Agent — Diff Report</title>
+  <title>DOM Agent - Diff Report</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Berkeley+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
@@ -53,16 +53,10 @@ export class HTMLDiffReporter implements DiffReporter {
       --added-bg:     #00e5a011;
       --deleted:      #ff4d6d;
       --deleted-bg:   #ff4d6d11;
-      --changed:      #f5a623;
-      --changed-bg:   #f5a62311;
-      --relocated:    #7b8cff;
-      --relocated-bg: #7b8cff11;
-      --subtree:      #e040fb;
-      --subtree-bg:   #e040fb11;
-      --fully:        #ff6b35;
-      --fully-bg:     #ff6b3511;
-      --node:         #00d4ff;
-      --node-bg:      #00d4ff11;
+      --reordered:    #7b8cff;
+      --reordered-bg: #7b8cff11;
+      --reparented:   #f5a623;
+      --reparented-bg:#f5a62311;
     }
 
     body {
@@ -74,7 +68,6 @@ export class HTMLDiffReporter implements DiffReporter {
       min-height: 100vh;
     }
 
-    /* noise texture overlay */
     body::before {
       content: '';
       position: fixed;
@@ -92,7 +85,6 @@ export class HTMLDiffReporter implements DiffReporter {
       padding: 48px 24px 96px;
     }
 
-    /* ── header ── */
     header {
       margin-bottom: 48px;
       border-bottom: 1px solid var(--border);
@@ -124,7 +116,6 @@ export class HTMLDiffReporter implements DiffReporter {
       letter-spacing: 0.05em;
     }
 
-    /* ── summary bar ── */
     .summary {
       display: flex;
       gap: 12px;
@@ -150,15 +141,11 @@ export class HTMLDiffReporter implements DiffReporter {
       letter-spacing: -0.02em;
     }
 
-    .pill.added        { color: var(--added);    border-color: var(--added);    background: var(--added-bg); }
-    .pill.deleted      { color: var(--deleted);  border-color: var(--deleted);  background: var(--deleted-bg); }
-    .pill.changed      { color: var(--changed);  border-color: var(--changed);  background: var(--changed-bg); }
-    .pill.relocated    { color: var(--relocated); border-color: var(--relocated); background: var(--relocated-bg); }
-    .pill.subtree      { color: var(--subtree);  border-color: var(--subtree);  background: var(--subtree-bg); }
-    .pill.fully        { color: var(--fully);    border-color: var(--fully);    background: var(--fully-bg); }
-    .pill.node-changed { color: var(--node);     border-color: var(--node);     background: var(--node-bg); }
+    .pill.added      { color: var(--added);      border-color: var(--added);      background: var(--added-bg); }
+    .pill.deleted    { color: var(--deleted);    border-color: var(--deleted);    background: var(--deleted-bg); }
+    .pill.reordered  { color: var(--reordered);  border-color: var(--reordered);  background: var(--reordered-bg); }
+    .pill.reparented { color: var(--reparented); border-color: var(--reparented); background: var(--reparented-bg); }
 
-    /* ── diff cards ── */
     .section-label {
       font-size: 10px;
       letter-spacing: 0.2em;
@@ -177,7 +164,7 @@ export class HTMLDiffReporter implements DiffReporter {
       background: var(--border);
     }
 
-    .cards { display: flex; flex-direction: column; gap: 2px; }
+    .cards { display: flex; flex-direction: column; gap: 12px; }
 
     .card {
       border: 1px solid var(--border);
@@ -208,12 +195,10 @@ export class HTMLDiffReporter implements DiffReporter {
       flex-shrink: 0;
     }
 
-    .badge.ADDED          { color: var(--added);    background: var(--added-bg);    border: 1px solid var(--added); }
-    .badge.DELETED        { color: var(--deleted);  background: var(--deleted-bg);  border: 1px solid var(--deleted); }
-    .badge.NODE_CHANGED   { color: var(--node);     background: var(--node-bg);     border: 1px solid var(--node); }
-    .badge.SUBTREE_CHANGED{ color: var(--subtree);  background: var(--subtree-bg);  border: 1px solid var(--subtree); }
-    .badge.FULLY_CHANGED  { color: var(--fully);    background: var(--fully-bg);    border: 1px solid var(--fully); }
-    .badge.RELOCATED      { color: var(--relocated); background: var(--relocated-bg); border: 1px solid var(--relocated); }
+    .badge.ADDED      { color: var(--added);      background: var(--added-bg);      border: 1px solid var(--added); }
+    .badge.DELETED    { color: var(--deleted);    background: var(--deleted-bg);    border: 1px solid var(--deleted); }
+    .badge.REORDERED  { color: var(--reordered);  background: var(--reordered-bg);  border: 1px solid var(--reordered); }
+    .badge.REPARENTED { color: var(--reparented); background: var(--reparented-bg); border: 1px solid var(--reparented); }
 
     .card-title {
       color: var(--text-bright);
@@ -243,11 +228,35 @@ export class HTMLDiffReporter implements DiffReporter {
 
     .card.open .card-body { display: block; }
 
-    /* ── node panels ── */
+    .move-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--surface);
+      color: var(--text-bright);
+    }
+
+    .move-arrow {
+      color: var(--reparented);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
     .panels {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .panels:last-child {
+      margin-bottom: 0;
     }
 
     @media (max-width: 600px) { .panels { grid-template-columns: 1fr; } }
@@ -296,9 +305,13 @@ export class HTMLDiffReporter implements DiffReporter {
       font-style: italic;
     }
 
-    .empty { color: var(--text-dim); font-style: italic; font-size: 11px; padding: 12px; }
+    .empty {
+      color: var(--text-dim);
+      font-style: italic;
+      font-size: 11px;
+      padding: 12px;
+    }
 
-    /* ── empty state ── */
     .no-diff {
       text-align: center;
       padding: 80px 24px;
@@ -326,7 +339,7 @@ export class HTMLDiffReporter implements DiffReporter {
   ${
     diffPoints.length === 0
       ? `<div class="no-diff">
-           <div class="no-diff-icon">✦</div>
+           <div class="no-diff-icon">*</div>
            <h2>No differences found</h2>
            <p>The two snapshots are structurally identical.</p>
          </div>`
@@ -345,28 +358,57 @@ export class HTMLDiffReporter implements DiffReporter {
 </html>`;
   }
 
-  private card(point: DiffPoint): string {
+  private card(point: DiffPoint<string>): string {
     const node = point.referenceNode ?? point.targetNode;
-    const title = node ? `&lt;${node.tagName}&gt;` : "unknown";
-    const meta = node
+    const title = this.nodeLabel(node);
+    const baseMeta = node
       ? `depth ${node.depth} · child ${node.nthChild}/${node.siblingCount}`
       : "";
+    const deltaMeta = point.delta !== undefined ? ` · Δ ${point.delta}` : "";
+    const parentSummary =
+      point.type === "REPARENTED"
+        ? `<div class="move-summary">
+             <span class="move-arrow">FROM</span>
+             <span>${this.nodeLabel(point.referenceParentNode ?? null)}</span>
+             <span class="move-arrow">TO</span>
+             <span>${this.nodeLabel(point.targetParentNode ?? null)}</span>
+           </div>`
+        : "";
+    const parentPanels =
+      point.type === "REPARENTED"
+        ? `<div class="panels">
+             ${this.panel("ref", "Reference Parent", point.referenceParentNode ?? null)}
+             ${this.panel("tgt", "Target Parent", point.targetParentNode ?? null)}
+           </div>`
+        : "";
 
     return /* html */ `
 <div class="card">
   <div class="card-header">
-    <span class="badge ${point.type}">${point.type.replace("_", " ")}</span>
+    <span class="badge ${point.type}">${point.type.replace(/_/g, " ")}</span>
     <span class="card-title">${title}</span>
-    <span class="card-meta">${meta}</span>
+    <span class="card-meta">${baseMeta}${deltaMeta}</span>
     <span class="chevron">▶</span>
   </div>
   <div class="card-body">
+    ${parentSummary}
     <div class="panels">
       ${this.panel("ref", "Reference", point.referenceNode)}
       ${this.panel("tgt", "Target", point.targetNode)}
     </div>
+    ${parentPanels}
   </div>
 </div>`;
+  }
+
+  private nodeLabel(node: ContextNode | null): string {
+    if (!node) return "—";
+
+    const attributes = Object.entries(node.attribute ?? {})
+      .map(([name, value]) => `${name}="${value}"`)
+      .join(" ");
+
+    return `&lt;${node.tagName}${attributes ? ` ${attributes}` : ""}&gt;`;
   }
 
   private panel(
@@ -393,7 +435,7 @@ export class HTMLDiffReporter implements DiffReporter {
   <div class="panel-body">
     <div class="field">
       <div class="field-key">tag</div>
-      <div class="field-val">&lt;${node.tagName}&gt;</div>
+      <div class="field-val">${this.nodeLabel(node)}</div>
     </div>
     <div class="field">
       <div class="field-key">position</div>
@@ -405,7 +447,7 @@ export class HTMLDiffReporter implements DiffReporter {
     </div>
     <div class="field">
       <div class="field-key">directText</div>
-      <div class="field-val">${node.directText ? `"${node.directText.slice(0, 60)}${node.directText.length > 60 ? "…" : ""}"` : "—"}</div>
+      <div class="field-val">${node.directText ? `"${node.directText.slice(0, 60)}${node.directText.length > 60 ? "..." : ""}"` : "—"}</div>
     </div>
     <div class="field">
       <div class="field-key">attributeFingerprints (${node.attributeCount})</div>
@@ -420,14 +462,18 @@ export class HTMLDiffReporter implements DiffReporter {
       <div class="field-val sig">${node.innerSignature}</div>
     </div>
     <div class="field">
-      <div class="field-key">contextSignature</div>
-      <div class="field-val sig">${node.contextSignature}</div>
+      <div class="field-key">positioningSignature</div>
+      <div class="field-val sig">${node.positioningSignature}</div>
+    </div>
+    <div class="field">
+      <div class="field-key">parentSignature</div>
+      <div class="field-val sig">${node.parentSignature ?? "—"}</div>
     </div>
   </div>
 </div>`;
   }
 
-  private counts(points: DiffPoint[]): Record<string, number> {
+  private counts(points: DiffPoint<string>[]): Record<string, number> {
     return points.reduce(
       (acc, p) => {
         acc[p.type] = (acc[p.type] ?? 0) + 1;
@@ -441,10 +487,8 @@ export class HTMLDiffReporter implements DiffReporter {
     const map: Record<string, string> = {
       ADDED: "added",
       DELETED: "deleted",
-      NODE_CHANGED: "node-changed",
-      SUBTREE_CHANGED: "subtree",
-      FULLY_CHANGED: "fully",
-      RELOCATED: "relocated",
+      REORDERED: "reordered",
+      REPARENTED: "reparented",
     };
 
     return Object.entries(counts)
@@ -452,7 +496,7 @@ export class HTMLDiffReporter implements DiffReporter {
         ([type, count]) => /* html */ `
         <div class="pill ${map[type] ?? ""}">
           <span class="pill-count">${count}</span>
-          ${type.replace("_", " ")}
+          ${type.replace(/_/g, " ")}
         </div>`,
       )
       .join("\n");
