@@ -117,7 +117,7 @@ export class HTMLToContextConverter {
       innerSignature,
       positioningSignature,
       parentSignature,
-      capturedAt: new Date(),
+      // capturedAt: new Date(),
     };
 
     contextNode.children.forEach((child, index) => {
