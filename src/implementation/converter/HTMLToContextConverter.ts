@@ -8,6 +8,8 @@ import {
 
 import { ContextTree } from "../../core";
 
+const IGNORED_ATTRIBUTES = new Set<string>(["class"]);
+
 export class HTMLToContextConverter {
   private hasher: HashAdapter;
   private idGenerator: IDAdapter;
@@ -18,22 +20,39 @@ export class HTMLToContextConverter {
   }
 
   convert(currentNode: HTMLNode, depth: number = 0) {
-    const root = this._convert(currentNode, depth, "root");
+    const root = this._convert(currentNode, depth);
     return root ? new ContextTree(root) : null;
+  }
+
+  private toComparableSignature(
+    nodeSignature: string,
+    attributeCount: number,
+  ): string {
+    if (attributeCount === 0) {
+      return nodeSignature;
+    }
+
+    const [tagName, attrCount, attrShapes] = nodeSignature.split("|");
+    return [tagName, attrCount, attrShapes, ""].join("|");
   }
 
   private _convert(
     currentNode: HTMLNode,
     depth: number = 0,
-    parentNodeSignature: string = "root", // HERE — fix 1: biết mình nằm dưới node nào
+    parentSignature: string | null = null,
   ): ContextNode | null {
     if (currentNode.type !== "tag") return null;
 
     const id = this.idGenerator.generate();
 
-    // build attributeFingerprints
+    const significantAttributes = Object.fromEntries(
+      Object.entries(currentNode.attributes).filter(
+        ([key]) => !IGNORED_ATTRIBUTES.has(key),
+      ),
+    );
+
     const attributeFingerprints: Record<string, ValueType> = Object.fromEntries(
-      Object.entries(currentNode.attributes).map(([key, value]) => [
+      Object.entries(significantAttributes).map(([key, value]) => [
         key,
         {
           numberOfValues: value.split(/[\s,;]+/).filter(Boolean).length,
@@ -42,32 +61,31 @@ export class HTMLToContextConverter {
       ]),
     );
 
-    const attrPairs = Object.values(attributeFingerprints)
-      .map((v) => `${v.numberOfValues}:${v.totalLength}`)
-      .sort()
+    const attrShapes = Object.entries(attributeFingerprints)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, v]) => `${v.numberOfValues}:${v.totalLength}`)
       .join(",");
 
-    // HERE — nodeSignature tính TRƯỚC khi recurse vào children
-    // vì nó không phụ thuộc children, chỉ phụ thuộc bề mặt node
-    // nhờ đó có thể truyền xuống làm parentNodeSignature cho children
     const nodeSignature = [
       currentNode.tagName,
       Object.keys(attributeFingerprints).length,
-      attrPairs, // HERE — thay thế sortedAttrKeys
+      attrShapes,
+      this.hasher.hash(currentNode.directText).slice(0, 12),
     ].join("|");
+    const comparableNodeSignature = this.toComparableSignature(
+      nodeSignature,
+      Object.keys(attributeFingerprints).length,
+    );
 
-    // DFS — recurse vào children, truyền nodeSignature hiện tại làm parent
     const childNodes: ContextNode[] = currentNode.children
-      .map((child) => this._convert(child, depth + 1, nodeSignature)) // HERE
+      .map((child) => this._convert(child, depth + 1, comparableNodeSignature))
       .filter((n): n is ContextNode => n !== null);
 
-    // backtrack — height chỉ tính được sau khi children xong
     const height =
       childNodes.length === 0
         ? 0
         : Math.max(...childNodes.map((c) => c.height)) + 1;
 
-    // innerSignature — hash 12 chars, tích lũy đệ quy từ children
     const innerSignature = this.hasher
       .hash(
         childNodes.length === 0
@@ -77,27 +95,17 @@ export class HTMLToContextConverter {
       )
       .slice(0, 12);
 
-    const structuralSignature = [
-      currentNode.tagName,
-      Object.keys(attributeFingerprints).length,
-    ].join("|");
-
-    // HERE — contextSignature is now computed (was empty string "")
-    const contextSignature = [
-      `${depth}:${currentNode.nthChild}/${currentNode.siblingCount}`,
-      nodeSignature,
-      innerSignature,
-    ].join("|");
+    const positioningSignature = `${depth}:${currentNode.nthChild}/${currentNode.siblingCount}`;
 
     const contextNode: ContextNode = {
       id,
       tagName: currentNode.tagName,
       attributeFingerprints,
-      attributeCount: Object.keys(currentNode.attributes).length,
+      attribute: currentNode.attributes,
+      attributeCount: Object.keys(significantAttributes).length,
       directText: currentNode.directText,
       depth,
       height,
-      structuralSignature,
       childCount: childNodes.length,
       siblingCount: currentNode.siblingCount,
       nthChild: currentNode.nthChild,
@@ -107,7 +115,8 @@ export class HTMLToContextConverter {
       children: childNodes,
       nodeSignature,
       innerSignature,
-      contextSignature,
+      positioningSignature,
+      parentSignature,
       capturedAt: new Date(),
     };
 

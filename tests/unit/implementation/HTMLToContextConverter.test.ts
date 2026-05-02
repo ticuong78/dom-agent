@@ -49,7 +49,7 @@ describe("HTMLToContextConverter", () => {
     test("root node has correct attributes", () => {
       const node = makeNode({ attributes: { class: "foo", id: "bar" } });
       const result = converter.convert(node)!;
-      expect(result.getRoot().attributes).toEqual({ class: "foo", id: "bar" });
+      expect(result.getRoot().attribute).toEqual({ class: "foo", id: "bar" });
     });
 
     test("root node has correct attributeCount", () => {
@@ -177,11 +177,46 @@ describe("HTMLToContextConverter", () => {
       expect(result.getRoot().parent).toBeNull();
     });
 
+    test("root node has null parentSignature", () => {
+      const result = converter.convert(makeNode())!;
+      expect(result.getRoot().parentSignature).toBeNull();
+    });
+
     test("child parent points to root", () => {
       const node = makeNode({ children: [makeNode()] });
       const result = converter.convert(node)!;
       const root = result.getRoot();
       expect(root.children[0]!.parent).toBe(root);
+    });
+
+    test("child parentSignature matches parent nodeSignature", () => {
+      const node = makeNode({ children: [makeNode()] });
+      const result = converter.convert(node)!;
+      const root = result.getRoot();
+      expect(root.children[0]!.parentSignature).toBe(root.nodeSignature);
+    });
+
+    test("parentSignature ignores parent directText when parent has significant attributes", () => {
+      const node = makeNode({
+        tagName: "div",
+        attributes: { id: "root" },
+        directText: "First text",
+        children: [makeNode()],
+      });
+      const otherNode = makeNode({
+        tagName: "div",
+        attributes: { id: "root" },
+        directText: "Second text",
+        children: [makeNode()],
+      });
+
+      const resultA = converter.convert(node)!;
+      const resultB = converter.convert(otherNode)!;
+
+      expect(resultA.getRoot().nodeSignature).not.toBe(resultB.getRoot().nodeSignature);
+      expect(resultA.getRoot().children[0]!.parentSignature).toBe(
+        resultB.getRoot().children[0]!.parentSignature,
+      );
     });
 
     test("grandchild parent points to child", () => {
@@ -242,6 +277,38 @@ describe("HTMLToContextConverter", () => {
         .convert(makeNode({ attributes: { id: "bar", class: "foo" } }))!
         .getRoot();
       expect(a.nodeSignature).toBe(b.nodeSignature);
+    });
+
+    test("nodes without attributes use directText in nodeSignature", () => {
+      const a = converter
+        .convert(makeNode({ tagName: "span", directText: "Uncle Tim" }))!
+        .getRoot();
+      const b = converter
+        .convert(makeNode({ tagName: "span", directText: "Aunt Sarah" }))!
+        .getRoot();
+      expect(a.nodeSignature).not.toBe(b.nodeSignature);
+    });
+
+    test("nodes with significant attributes still keep directText in nodeSignature", () => {
+      const a = converter
+        .convert(
+          makeNode({
+            tagName: "div",
+            attributes: { "data-role": "cousin" },
+            directText: "First text",
+          }),
+        )!
+        .getRoot();
+      const b = converter
+        .convert(
+          makeNode({
+            tagName: "div",
+            attributes: { "data-role": "cousin" },
+            directText: "Second text",
+          }),
+        )!
+        .getRoot();
+      expect(a.nodeSignature).not.toBe(b.nodeSignature);
     });
 
     test("different depth produces different contextSignature", () => {

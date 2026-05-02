@@ -3,65 +3,63 @@ import type { ContextNode } from "../atoms";
 export class ContextTree {
   private root: ContextNode;
 
-  private byContext: Map<string, ContextNode> = new Map();
-  private byNode: Map<string, ContextNode[]> = new Map();
-  private byInner: Map<string, ContextNode[]> = new Map();
+  private byCompositeKey: Map<string, ContextNode> = new Map();
+  private byComparableNodeSignature: Map<string, ContextNode[]> = new Map();
 
   constructor(root: ContextNode) {
-    this.root = root;
+    this.root = root; // giữ root chỉ để sau này tạo một persistent snapshot lưu vào disk
     this.walk(root);
   }
 
   private walk(node: ContextNode): void {
-    // primary — unique per node (vị trí + bề mặt + subtree)
-    this.byContext.set(node.contextSignature, node);
+    this.byCompositeKey.set(ContextTree.compositeKey(node), node);
 
-    // secondary — có thể trùng, nhiều node cùng tag/attrs/text
-    const nodeGroup = this.byNode.get(node.nodeSignature) ?? [];
-    nodeGroup.push(node);
-    this.byNode.set(node.nodeSignature, nodeGroup);
-
-    // tertiary — có thể trùng, nhiều node cùng cấu trúc subtree
-    const innerGroup = this.byInner.get(node.innerSignature) ?? [];
-    innerGroup.push(node);
-    this.byInner.set(node.innerSignature, innerGroup);
+    const comparableNodeSignature = ContextTree.comparableNodeSignature(node);
+    const comparableGroup =
+      this.byComparableNodeSignature.get(comparableNodeSignature) ?? [];
+    comparableGroup.push(node);
+    this.byComparableNodeSignature.set(
+      comparableNodeSignature,
+      comparableGroup,
+    );
 
     node.children.forEach((child) => this.walk(child));
+  }
+
+  static compositeKey(node: ContextNode): string {
+    return `${node.positioningSignature}|${node.nodeSignature}|${node.innerSignature}`;
+  }
+
+  static comparableNodeSignature(node: ContextNode): string {
+    if (node.attributeCount === 0) {
+      return node.nodeSignature;
+    }
+
+    const [tagName, attrCount, attrShapes] = node.nodeSignature.split("|");
+    return [tagName, attrCount, attrShapes, ""].join("|");
   }
 
   getRoot(): ContextNode {
     return this.root;
   }
 
-  getByContext(sig: string): ContextNode | undefined {
-    return this.byContext.get(sig);
+  getByCompositeKey(key: string): ContextNode | undefined {
+    return this.byCompositeKey.get(key);
   }
 
-  getByNode(sig: string): ContextNode[] {
-    return this.byNode.get(sig) ?? [];
+  getByComparableNodeSignature(key: string): ContextNode[] {
+    return this.byComparableNodeSignature.get(key) ?? [];
   }
 
-  getByInner(sig: string): ContextNode[] {
-    return this.byInner.get(sig) ?? [];
+  compositeKeys(): Set<string> {
+    return new Set(this.byCompositeKey.keys());
   }
 
-  hasContext(sig: string): boolean {
-    return this.byContext.has(sig);
-  }
-
-  hasNode(sig: string): boolean {
-    return this.byNode.has(sig);
-  }
-
-  hasInner(sig: string): boolean {
-    return this.byInner.has(sig);
-  }
-
-  contextSignatures(): Set<string> {
-    return new Set(this.byContext.keys());
+  comparableNodeSignatures(): Set<string> {
+    return new Set(this.byComparableNodeSignature.keys());
   }
 
   size(): number {
-    return this.byContext.size;
+    return this.byCompositeKey.size;
   }
 }
