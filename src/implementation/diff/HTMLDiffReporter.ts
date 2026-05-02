@@ -1,0 +1,460 @@
+import * as fs from "fs";
+import * as path from "path";
+import type { DiffPoint } from "@core/diff";
+import type { ContextNode } from "@core/context";
+import type { DiffReporter } from "@core/diff/DiffReporter";
+
+export class HTMLDiffReporter implements DiffReporter {
+  private outputPath: string;
+
+  constructor(outputPath: string = "report/index.html") {
+    this.outputPath = outputPath;
+  }
+
+  report(diffPoints: DiffPoint[]): void {
+    const html = this.render(diffPoints);
+    const dir = path.dirname(this.outputPath);
+
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    fs.writeFileSync(this.outputPath, html, "utf-8");
+    console.log(`[dom-agent] report written → ${this.outputPath}`);
+  }
+
+  private render(diffPoints: DiffPoint[]): string {
+    const counts = this.counts(diffPoints);
+    const cards = diffPoints.map((p) => this.card(p)).join("\n");
+    const timestamp = new Date().toISOString();
+
+    return /* html */ `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DOM Agent — Diff Report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Berkeley+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #0a0a0f;
+      --surface:      #11111a;
+      --surface-2:    #18182a;
+      --border:       #2a2a3d;
+      --text:         #c9c9e4;
+      --text-dim:     #5a5a7a;
+      --text-bright:  #eeeeff;
+
+      --added:        #00e5a0;
+      --added-bg:     #00e5a011;
+      --deleted:      #ff4d6d;
+      --deleted-bg:   #ff4d6d11;
+      --changed:      #f5a623;
+      --changed-bg:   #f5a62311;
+      --relocated:    #7b8cff;
+      --relocated-bg: #7b8cff11;
+      --subtree:      #e040fb;
+      --subtree-bg:   #e040fb11;
+      --fully:        #ff6b35;
+      --fully-bg:     #ff6b3511;
+      --node:         #00d4ff;
+      --node-bg:      #00d4ff11;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Berkeley Mono', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* noise texture overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wrap {
+      position: relative;
+      z-index: 1;
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 48px 24px 96px;
+    }
+
+    /* ── header ── */
+    header {
+      margin-bottom: 48px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 32px;
+    }
+
+    .logo {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 11px;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 32px;
+      color: var(--text-bright);
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+
+    .timestamp {
+      color: var(--text-dim);
+      font-size: 11px;
+      letter-spacing: 0.05em;
+    }
+
+    /* ── summary bar ── */
+    .summary {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 40px;
+    }
+
+    .pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 4px;
+      border: 1px solid;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .pill-count {
+      font-size: 18px;
+      letter-spacing: -0.02em;
+    }
+
+    .pill.added        { color: var(--added);    border-color: var(--added);    background: var(--added-bg); }
+    .pill.deleted      { color: var(--deleted);  border-color: var(--deleted);  background: var(--deleted-bg); }
+    .pill.changed      { color: var(--changed);  border-color: var(--changed);  background: var(--changed-bg); }
+    .pill.relocated    { color: var(--relocated); border-color: var(--relocated); background: var(--relocated-bg); }
+    .pill.subtree      { color: var(--subtree);  border-color: var(--subtree);  background: var(--subtree-bg); }
+    .pill.fully        { color: var(--fully);    border-color: var(--fully);    background: var(--fully-bg); }
+    .pill.node-changed { color: var(--node);     border-color: var(--node);     background: var(--node-bg); }
+
+    /* ── diff cards ── */
+    .section-label {
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .cards { display: flex; flex-direction: column; gap: 2px; }
+
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      background: var(--surface);
+      transition: border-color 0.15s;
+    }
+
+    .card:hover { border-color: #3a3a5a; }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .badge {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .badge.ADDED          { color: var(--added);    background: var(--added-bg);    border: 1px solid var(--added); }
+    .badge.DELETED        { color: var(--deleted);  background: var(--deleted-bg);  border: 1px solid var(--deleted); }
+    .badge.NODE_CHANGED   { color: var(--node);     background: var(--node-bg);     border: 1px solid var(--node); }
+    .badge.SUBTREE_CHANGED{ color: var(--subtree);  background: var(--subtree-bg);  border: 1px solid var(--subtree); }
+    .badge.FULLY_CHANGED  { color: var(--fully);    background: var(--fully-bg);    border: 1px solid var(--fully); }
+    .badge.RELOCATED      { color: var(--relocated); background: var(--relocated-bg); border: 1px solid var(--relocated); }
+
+    .card-title {
+      color: var(--text-bright);
+      font-size: 13px;
+      flex: 1;
+    }
+
+    .card-meta {
+      color: var(--text-dim);
+      font-size: 11px;
+    }
+
+    .chevron {
+      color: var(--text-dim);
+      transition: transform 0.2s;
+      font-size: 10px;
+    }
+
+    .card.open .chevron { transform: rotate(90deg); }
+
+    .card-body {
+      display: none;
+      border-top: 1px solid var(--border);
+      padding: 16px;
+      background: var(--surface-2);
+    }
+
+    .card.open .card-body { display: block; }
+
+    /* ── node panels ── */
+    .panels {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    @media (max-width: 600px) { .panels { grid-template-columns: 1fr; } }
+
+    .panel {
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .panel-label {
+      font-size: 9px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      padding: 6px 12px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      color: var(--text-dim);
+    }
+
+    .panel-label.ref  { border-left: 2px solid var(--deleted); }
+    .panel-label.tgt  { border-left: 2px solid var(--added); }
+    .panel-label.none { border-left: 2px solid var(--border); font-style: italic; }
+
+    .panel-body { padding: 12px; }
+
+    .field { margin-bottom: 8px; }
+    .field:last-child { margin-bottom: 0; }
+
+    .field-key {
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 0.05em;
+      margin-bottom: 2px;
+    }
+
+    .field-val {
+      color: var(--text-bright);
+      word-break: break-all;
+    }
+
+    .sig {
+      font-size: 10px;
+      color: var(--text-dim);
+      word-break: break-all;
+      font-style: italic;
+    }
+
+    .empty { color: var(--text-dim); font-style: italic; font-size: 11px; padding: 12px; }
+
+    /* ── empty state ── */
+    .no-diff {
+      text-align: center;
+      padding: 80px 24px;
+      color: var(--text-dim);
+    }
+
+    .no-diff-icon { font-size: 48px; margin-bottom: 16px; }
+    .no-diff h2 { font-family: 'Syne', sans-serif; color: var(--added); font-size: 20px; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">dom-agent</div>
+    <h1>Diff Report</h1>
+    <div class="timestamp">${timestamp}</div>
+  </header>
+
+  <div class="summary">
+    ${this.summaryPills(counts)}
+  </div>
+
+  <div class="section-label">${diffPoints.length} change${diffPoints.length !== 1 ? "s" : ""} detected</div>
+
+  ${
+    diffPoints.length === 0
+      ? `<div class="no-diff">
+           <div class="no-diff-icon">✦</div>
+           <h2>No differences found</h2>
+           <p>The two snapshots are structurally identical.</p>
+         </div>`
+      : `<div class="cards">${cards}</div>`
+  }
+</div>
+
+<script>
+  document.querySelectorAll('.card-header').forEach(header => {
+    header.addEventListener('click', () => {
+      header.closest('.card').classList.toggle('open');
+    });
+  });
+</script>
+</body>
+</html>`;
+  }
+
+  private card(point: DiffPoint): string {
+    const node = point.referenceNode ?? point.targetNode;
+    const title = node ? `&lt;${node.tagName}&gt;` : "unknown";
+    const meta = node
+      ? `depth ${node.depth} · child ${node.nthChild}/${node.siblingCount}`
+      : "";
+
+    return /* html */ `
+<div class="card">
+  <div class="card-header">
+    <span class="badge ${point.type}">${point.type.replace("_", " ")}</span>
+    <span class="card-title">${title}</span>
+    <span class="card-meta">${meta}</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="card-body">
+    <div class="panels">
+      ${this.panel("ref", "Reference", point.referenceNode)}
+      ${this.panel("tgt", "Target", point.targetNode)}
+    </div>
+  </div>
+</div>`;
+  }
+
+  private panel(
+    cls: "ref" | "tgt",
+    label: string,
+    node: ContextNode | null,
+  ): string {
+    if (!node) {
+      return /* html */ `
+<div class="panel">
+  <div class="panel-label none">${label} — none</div>
+  <div class="empty">not present in this snapshot</div>
+</div>`;
+    }
+
+    const attrEntries =
+      Object.entries(node.attributeFingerprints)
+        .map(([k, v]) => `${k}: {n:${v.numberOfValues}, len:${v.totalLength}}`)
+        .join(", ") || "—";
+
+    return /* html */ `
+<div class="panel">
+  <div class="panel-label ${cls}">${label}</div>
+  <div class="panel-body">
+    <div class="field">
+      <div class="field-key">tag</div>
+      <div class="field-val">&lt;${node.tagName}&gt;</div>
+    </div>
+    <div class="field">
+      <div class="field-key">position</div>
+      <div class="field-val">depth ${node.depth} · nthChild ${node.nthChild} · siblings ${node.siblingCount}</div>
+    </div>
+    <div class="field">
+      <div class="field-key">size</div>
+      <div class="field-val">children ${node.childCount} · height ${node.height}</div>
+    </div>
+    <div class="field">
+      <div class="field-key">directText</div>
+      <div class="field-val">${node.directText ? `"${node.directText.slice(0, 60)}${node.directText.length > 60 ? "…" : ""}"` : "—"}</div>
+    </div>
+    <div class="field">
+      <div class="field-key">attributeFingerprints (${node.attributeCount})</div>
+      <div class="field-val sig">${attrEntries}</div>
+    </div>
+    <div class="field">
+      <div class="field-key">nodeSignature</div>
+      <div class="field-val sig">${node.nodeSignature}</div>
+    </div>
+    <div class="field">
+      <div class="field-key">innerSignature</div>
+      <div class="field-val sig">${node.innerSignature}</div>
+    </div>
+    <div class="field">
+      <div class="field-key">contextSignature</div>
+      <div class="field-val sig">${node.contextSignature}</div>
+    </div>
+  </div>
+</div>`;
+  }
+
+  private counts(points: DiffPoint[]): Record<string, number> {
+    return points.reduce(
+      (acc, p) => {
+        acc[p.type] = (acc[p.type] ?? 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+  }
+
+  private summaryPills(counts: Record<string, number>): string {
+    const map: Record<string, string> = {
+      ADDED: "added",
+      DELETED: "deleted",
+      NODE_CHANGED: "node-changed",
+      SUBTREE_CHANGED: "subtree",
+      FULLY_CHANGED: "fully",
+      RELOCATED: "relocated",
+    };
+
+    return Object.entries(counts)
+      .map(
+        ([type, count]) => /* html */ `
+        <div class="pill ${map[type] ?? ""}">
+          <span class="pill-count">${count}</span>
+          ${type.replace("_", " ")}
+        </div>`,
+      )
+      .join("\n");
+  }
+}
