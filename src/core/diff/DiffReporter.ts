@@ -5,5 +5,5 @@ import type { DiffPoint } from "./DiffPoint";
  * viewer phát ra (string là superset của mọi DiffType extension).
  */
 export interface DiffReporter {
-  report(diffPoints: DiffPoint<string>[]): void;
+  report(diffPoints: DiffPoint<string>[], outputPath: string): void;
 }

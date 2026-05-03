@@ -2,41 +2,27 @@ import type { ContextNode } from "../atoms";
 
 export class ContextTree {
   private root: ContextNode;
-
   private byCompositeKey: Map<string, ContextNode> = new Map();
-  private byComparableNodeSignature: Map<string, ContextNode[]> = new Map();
+  private allNodes: ContextNode[] = [];
 
   constructor(root: ContextNode) {
-    this.root = root; // giữ root chỉ để sau này tạo một persistent snapshot lưu vào disk
-    this.walk(root);
+    this.root = root;
+    this.index(root);
   }
 
-  private walk(node: ContextNode): void {
+  private index(node: ContextNode): void {
     this.byCompositeKey.set(ContextTree.compositeKey(node), node);
-
-    const comparableNodeSignature = ContextTree.comparableNodeSignature(node);
-    const comparableGroup =
-      this.byComparableNodeSignature.get(comparableNodeSignature) ?? [];
-    comparableGroup.push(node);
-    this.byComparableNodeSignature.set(
-      comparableNodeSignature,
-      comparableGroup,
-    );
-
-    node.children.forEach((child) => this.walk(child));
+    this.allNodes.push(node);
+    node.children.forEach((child) => this.index(child));
   }
 
   static compositeKey(node: ContextNode): string {
-    return `${node.positioningSignature}|${node.nodeSignature}|${node.innerSignature}`;
-  }
-
-  static comparableNodeSignature(node: ContextNode): string {
-    if (node.attributeCount === 0) {
-      return node.nodeSignature;
-    }
-
-    const [tagName, attrCount, attrShapes] = node.nodeSignature.split("|");
-    return [tagName, attrCount, attrShapes, ""].join("|");
+    return [
+      `${node.depth}:${node.nthChild}/${node.siblingCount}`,
+      node.tagName,
+      node.attributeCount,
+      node.directTextHash,
+    ].join("|");
   }
 
   getRoot(): ContextNode {
@@ -47,16 +33,15 @@ export class ContextTree {
     return this.byCompositeKey.get(key);
   }
 
-  getByComparableNodeSignature(key: string): ContextNode[] {
-    return this.byComparableNodeSignature.get(key) ?? [];
-  }
-
   compositeKeys(): Set<string> {
     return new Set(this.byCompositeKey.keys());
   }
 
-  comparableNodeSignatures(): Set<string> {
-    return new Set(this.byComparableNodeSignature.keys());
+  /**
+   * Returns all nodes in the tree (pre-order traversal).
+   */
+  nodes(): ContextNode[] {
+    return this.allNodes;
   }
 
   size(): number {
