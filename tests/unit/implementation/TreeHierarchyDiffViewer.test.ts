@@ -2,7 +2,7 @@ import { SHA256HashAdapter } from "@adapters/hash/SHA256HashAdapter";
 import { UUIDAdapter } from "@adapters/id/UUIDAdapter";
 import type { HTMLNode } from "@core/plain/HTMLNode";
 import { HTMLToContextConverter } from "@implementation/converter/HTMLToContextConverter";
-import { TreeHierarchyDiffViewer } from "@implementation/diff/TreeHierarchyDiffViewer";
+import { TreeHierarchyDiffViewer } from "@implementation/diff/viewer/TreeHierarchyDiffViewer";
 
 const makeNode = (overrides: Partial<HTMLNode> = {}): HTMLNode => ({
   type: "tag",
