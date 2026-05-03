@@ -2,106 +2,232 @@ import { CheerioAdapter } from "@adapters/atom";
 import { SHA256HashAdapter } from "@adapters/hash";
 import { UUIDAdapter } from "@adapters/id";
 import { HTMLToContextConverter } from "@implementation/converter/HTMLToContextConverter";
-import { TreeHierarchyDiffViewer } from "@implementation/diff/TreeHierarchyDiffViewer";
-import { HTMLDiffReporter } from "@implementation/diff/HTMLDiffReporter";
+import { CompareRule } from "@core/compare/CompareRule";
+import { RuleBasedComparer, type GroupKeyFn } from "@implementation/compare/RuleBasedComparer";
+import { TreeHierarchyDiffViewer } from "@implementation/diff/viewer/TreeHierarchyDiffViewer";
+import { NodeMutationDiffViewer } from "@implementation/diff/viewer/NodeMutationDiffViewer";
+import { SubtreeShapeDiffViewer } from "@implementation/diff/viewer/SubtreeShapeDiffViewer";
+import { HTMLDiffReporter } from "@implementation/diff/reporter/HTMLDiffReporter";
+import { JSONDiffReporter } from "@implementation/diff/reporter/JSONDiffReporter";
 
+// ─── V1: Reference snapshot ─────────────────────────────────
 const html = `
 <!DOCTYPE html>
 <html lang="en">
 <body>
-  <div class="generation_one" id="grandparents" data-generation="1">
-    This is your grand parents family tree
+  <div class="root" id="app" data-v="1">
+    Version One
 
-    <!-- subtree đổi → DELETED + có thể kèm SUBTREE_CHANGED (cùng nodeSig) -->
-    <div class="generation_two gen_a" id="parents-side" data-generation="2">
-      This is your parents side
+    <!-- TEXT_CHANGED: text will change -->
+    <header class="site-header" data-s="header">Welcome Old</header>
 
-      <!-- subtree (text con) đổi → DELETED + SUBTREE_CHANGED -->
-      <div class="generation_three gen_z" data-generation="3">
-        <p>This is your generation</p>
-      </div>
+    <!-- SHRUNK: will lose a child -->
+    <nav class="site-nav" data-s="nav">
+      <a class="lnk-home" data-to="home">Home</a>
+      <a class="lnk-about" data-to="about">About</a>
+      <a class="lnk-help" data-to="help">Help</a>
+    </nav>
 
-      <!-- biến mất → DELETED -->
-      <div class="uncle" data-role="uncle">
-        <span>Uncle Bob</span>
-        <span>Uncle Tim</span>
-      </div>
-
-      <!-- vị trí đổi → DELETED ở chỗ cũ, ADDED ở chỗ mới -->
-      <div class="cousin" data-role="cousin">
-        <p>Cousin Anna</p>
-      </div>
+    <!-- REORDERED: children will swap -->
+    <div class="columns" data-s="cols">
+      <div class="col-left" data-pos="left">Left Panel</div>
+      <div class="col-right" data-pos="right">Right Panel</div>
     </div>
 
-    <!-- biến mất → DELETED -->
-    <aside class="family-note" data-generation="2">
-      <p>Some old note about the family</p>
-    </aside>
+    <!-- TRAP: uncle bob — must NOT match aunt sarah -->
+    <div class="uncle" data-role="uncle">
+      <span class="tag" data-who="bob">Uncle Bob</span>
+    </div>
+
+    <!-- TAG_CHANGED: div will become section -->
+    <div class="bulletin" data-s="bulletin">
+      <p class="note" data-id="n1">Note one</p>
+    </div>
+
+    <!-- ATTRIBUTE_CHANGED: will gain data-verified -->
+    <div class="profile" data-s="profile">
+      <p class="bio" data-id="bio">My bio</p>
+    </div>
+
+    <!-- REPARENTED: will move into a new wrapper -->
+    <div class="widget" data-role="widget">
+      <p class="w-body" data-id="w1">Widget body</p>
+    </div>
+
+    <!-- GROWN: will gain more images -->
+    <div class="photos" data-s="photos">
+      <img class="ph-one" data-id="p1" />
+    </div>
+
+    <!-- DEPTH_CHANGED: subtree will deepen without gaining direct children -->
+    <div class="forum" data-s="forum">
+      <div class="msg-a" data-id="ma">Message A</div>
+      <div class="msg-b" data-id="mb">Message B</div>
+    </div>
+
+    <!-- DELETED: will be removed -->
+    <footer class="old-footer" data-s="footer">
+      <p class="bye" data-id="bye">Goodbye</p>
+    </footer>
   </div>
 </body>
 </html>
 `;
 
+// ─── V2: Target snapshot ─────────────────────────────────────
 const htmlV2 = `
 <!DOCTYPE html>
 <html lang="en">
 <body>
-  <div class="generation_one" id="grandparents" data-generation="1">
-    This is your grandparents family tree
+  <div class="root" id="app" data-v="1">
+    Version Two
 
-    <!-- attrs đổi → ADDED ở phía target (contextSig khác bản cũ) -->
-    <div class="generation_two gen_a branch_main" id="parents-side" data-generation="2">
-      This is your parents side
+    <!-- TEXT_CHANGED -->
+    <header class="site-header" data-s="header">Welcome New</header>
 
-      <!-- text con đổi → ADDED ở phía target -->
-      <div class="generation_three gen_z" data-generation="3">
-        <p>This is your generation now</p>
-      </div>
+    <!-- SHRUNK: lost lnk-help -->
+    <nav class="site-nav" data-s="nav">
+      <a class="lnk-home" data-to="home">Home</a>
+      <a class="lnk-about" data-to="about">About</a>
+    </nav>
 
-      <!-- uncle không có ở target → DELETED ở phía reference -->
-
-      <!-- ADDED: aunt mới -->
-      <div class="aunt" data-role="aunt">
-        <span>Aunt Sarah</span>
-      </div>
+    <!-- REORDERED: children swapped -->
+    <div class="columns" data-s="cols">
+      <div class="col-right" data-pos="right">Right Panel</div>
+      <div class="col-left" data-pos="left">Left Panel</div>
     </div>
 
-    <!-- ADDED: thay thế cho aside cũ (aside thì DELETED) -->
-    <section class="family-news" data-generation="2">
-      <h2>Family updates 2026</h2>
+    <!-- TRAP: aunt sarah — different attribute values -->
+    <div class="aunt" data-role="aunt">
+      <span class="tag" data-who="sarah">Aunt Sarah</span>
+    </div>
+
+    <!-- TAG_CHANGED: section instead of div, same attributes -->
+    <section class="bulletin" data-s="bulletin">
+      <p class="note" data-id="n1">Note one</p>
     </section>
 
-    <!-- nhánh mới hoàn toàn → ADDED -->
-    <div class="extended-family" data-generation="2">
-      <!-- cousin ở vị trí mới → ADDED ở chỗ này, vị trí cũ là DELETED -->
-      <div class="cousin" data-role="cousin">
-        <p>Cousin Anna</p>
+    <!-- ATTRIBUTE_CHANGED: gained data-verified -->
+    <div class="profile" data-s="profile" data-verified="true">
+      <p class="bio" data-id="bio">My bio</p>
+    </div>
+
+    <!-- REPARENTED: widget now inside dock wrapper -->
+    <div class="widget-dock" data-s="dock">
+      <div class="widget" data-role="widget">
+        <p class="w-body" data-id="w1">Widget body</p>
       </div>
     </div>
+
+    <!-- GROWN: more images -->
+    <div class="photos" data-s="photos">
+      <img class="ph-one" data-id="p1" />
+      <img class="ph-two" data-id="p2" />
+      <img class="ph-three" data-id="p3" />
+    </div>
+
+    <!-- DEPTH_CHANGED: msg-a now has a nested reply, forum keeps 2 direct children -->
+    <div class="forum" data-s="forum">
+      <div class="msg-a" data-id="ma">
+        Message A
+        <div class="reply" data-id="r1">Reply to A</div>
+      </div>
+      <div class="msg-b" data-id="mb">Message B</div>
+    </div>
+
+    <!-- ADDED: entirely new -->
+    <section class="promo" data-s="promo">
+      <h2 class="promo-title" data-id="pt1">Special Offer</h2>
+    </section>
   </div>
 </body>
 </html>
 `;
 
+// ─── Setup ───────────────────────────────────────────────────
 const cheerioAdapter = new CheerioAdapter();
 const rootNodeV1 = cheerioAdapter.parse(html);
 const rootNodeV2 = cheerioAdapter.parse(htmlV2);
-
 if (!rootNodeV1 || !rootNodeV2) throw new Error("Roots are empty.");
 
 const converter = new HTMLToContextConverter(
-  new SHA256HashAdapter(),
   new UUIDAdapter(),
+  new SHA256HashAdapter(),
 );
-
 const treeV1 = converter.convert(rootNodeV1);
 const treeV2 = converter.convert(rootNodeV2);
 
-const diffViewer = new TreeHierarchyDiffViewer();
+// ─── Comparers (each viewer gets the comparer it needs) ─────
 
-const diffPoints = diffViewer.highlight(treeV1!, treeV2!);
+// Hierarchy: tagName + values_match, NO depth constraint
+// → allows matching reparented nodes that changed depth
+const hierarchyRule = new CompareRule([
+  { attType: "tagName", matchType: "match", logicType: "and" },
+  { attType: "attributeAnalytic", matchType: "values_match", logicType: "and" },
+]);
+const hierarchyComparer = new RuleBasedComparer(hierarchyRule);
 
-const diffReporter = new HTMLDiffReporter();
+// Mutation: depth + values_match, grouped by depth (NO tagName)
+// → allows matching nodes that changed tag (TAG_CHANGED)
+// → values_match only checks shared keys, so added/removed attrs still pair (ATTRIBUTE_CHANGED)
+const groupByDepth: GroupKeyFn = (node) => String(node.depth);
+const mutationRule = new CompareRule([
+  { attType: "depth", matchType: "equal", logicType: "and" },
+  { attType: "attributeAnalytic", matchType: "values_match", logicType: "and" },
+]);
+const mutationComparer = new RuleBasedComparer(mutationRule, groupByDepth);
 
-// console.dir(diffPoints);
-diffReporter.report(diffPoints);
+// Shape: tagName + values_match
+// → standard structural comparison for subtree changes
+const shapeRule = new CompareRule([
+  { attType: "tagName", matchType: "match", logicType: "and" },
+  { attType: "attributeAnalytic", matchType: "values_match", logicType: "and" },
+]);
+const shapeComparer = new RuleBasedComparer(shapeRule);
+
+// ─── Viewers ─────────────────────────────────────────────────
+const hierarchyViewer = new TreeHierarchyDiffViewer(hierarchyComparer);
+const mutationViewer = new NodeMutationDiffViewer(mutationComparer);
+const shapeViewer = new SubtreeShapeDiffViewer(shapeComparer);
+
+// ─── Run & Report ────────────────────────────────────────────
+console.log("=== TreeHierarchyDiffViewer ===");
+console.log("  (expects: REPARENTED, REORDERED, ADDED, DELETED)");
+const hierarchyDiffs = hierarchyViewer.highlight(treeV1!, treeV2!);
+for (const d of hierarchyDiffs) {
+  const ref = d.referenceNode;
+  const tar = d.targetNode;
+  const label = (n: typeof ref) =>
+    n ? `${n.tagName}.${n.attributeAnalytic?.class?.actualValue ?? "?"}` : "---";
+  console.log(`  ${d.type}: ${label(ref)} -> ${label(tar)}`);
+}
+
+console.log("\n=== NodeMutationDiffViewer ===");
+console.log("  (expects: TAG_CHANGED, ATTRIBUTE_CHANGED, TEXT_CHANGED, ADDED, DELETED)");
+const mutationDiffs = mutationViewer.highlight(treeV1!, treeV2!);
+for (const d of mutationDiffs) {
+  const ref = d.referenceNode;
+  const tar = d.targetNode;
+  const label = (n: typeof ref) =>
+    n ? `${n.tagName}.${n.attributeAnalytic?.class?.actualValue ?? "?"}` : "---";
+  console.log(`  ${d.type}: ${label(ref)} -> ${label(tar)}`);
+}
+
+console.log("\n=== SubtreeShapeDiffViewer ===");
+console.log("  (expects: GROWN, SHRUNK, DEPTH_CHANGED, ADDED, DELETED)");
+const shapeDiffs = shapeViewer.highlight(treeV1!, treeV2!);
+for (const d of shapeDiffs) {
+  const ref = d.referenceNode;
+  const tar = d.targetNode;
+  const label = (n: typeof ref) =>
+    n ? `${n.tagName}.${n.attributeAnalytic?.class?.actualValue ?? "?"}` : "---";
+  console.log(`  ${d.type} (delta=${d.delta ?? 0}): ${label(ref)} -> ${label(tar)}`);
+}
+
+// ─── Reports ─────────────────────────────────────────────────
+HTMLDiffReporter.report(hierarchyDiffs, "report/hierarchyDiffs.html");
+HTMLDiffReporter.report(mutationDiffs, "report/mutationDiffs.html");
+HTMLDiffReporter.report(shapeDiffs, "report/shapeDiffs.html");
+JSONDiffReporter.report(hierarchyDiffs, "report/hierarchyDiffs.json");
+JSONDiffReporter.report(mutationDiffs, "report/mutationDiffs.json");
+JSONDiffReporter.report(shapeDiffs, "report/shapeDiffs.json");
