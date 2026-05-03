@@ -5,27 +5,30 @@ import type { ContextNode } from "@core/context";
 import type { DiffReporter } from "@core/diff/DiffReporter";
 
 export class HTMLDiffReporter implements DiffReporter {
-  private outputPath: string;
-
-  constructor(outputPath: string = "report/index.html") {
-    this.outputPath = outputPath;
+  report(diffPoints: DiffPoint<string>[], outputPath: string): void {
+    throw new Error(
+      "Method not implemented. Use the static report method instead.",
+    );
   }
 
-  report(diffPoints: DiffPoint<string>[]): void {
-    const html = this.render(diffPoints);
-    const dir = path.dirname(this.outputPath);
+  public static report(
+    diffPoints: DiffPoint<string>[],
+    outputPath: string = "report/index.html",
+  ): void {
+    const html = HTMLDiffReporter._render(diffPoints);
+    const dir = path.dirname(outputPath);
 
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
 
-    fs.writeFileSync(this.outputPath, html, "utf-8");
-    console.log(`[dom-agent] report written -> ${this.outputPath}`);
+    fs.writeFileSync(outputPath, html, "utf-8");
+    console.log(`[dom-agent] report written -> ${outputPath}`);
   }
 
-  private render(diffPoints: DiffPoint<string>[]): string {
-    const counts = this.counts(diffPoints);
-    const cards = diffPoints.map((p) => this.card(p)).join("\n");
+  private static _render(diffPoints: DiffPoint<string>[]): string {
+    const counts = HTMLDiffReporter._counts(diffPoints);
+    const cards = diffPoints.map((p) => HTMLDiffReporter._card(p)).join("\n");
     const timestamp = new Date().toISOString();
 
     return /* html */ `<!DOCTYPE html>
@@ -57,6 +60,19 @@ export class HTMLDiffReporter implements DiffReporter {
       --reordered-bg: #7b8cff11;
       --reparented:   #f5a623;
       --reparented-bg:#f5a62311;
+
+      --tag-changed:       #e879f9;
+      --tag-changed-bg:    #e879f911;
+      --attribute-changed: #67e8f9;
+      --attribute-changed-bg: #67e8f911;
+      --text-changed:      #fbbf24;
+      --text-changed-bg:   #fbbf2411;
+      --grown:             #4ade80;
+      --grown-bg:          #4ade8011;
+      --shrunk:            #fb923c;
+      --shrunk-bg:         #fb923c11;
+      --depth-changed:     #a78bfa;
+      --depth-changed-bg:  #a78bfa11;
     }
 
     body {
@@ -145,6 +161,12 @@ export class HTMLDiffReporter implements DiffReporter {
     .pill.deleted    { color: var(--deleted);    border-color: var(--deleted);    background: var(--deleted-bg); }
     .pill.reordered  { color: var(--reordered);  border-color: var(--reordered);  background: var(--reordered-bg); }
     .pill.reparented { color: var(--reparented); border-color: var(--reparented); background: var(--reparented-bg); }
+    .pill.tag-changed       { color: var(--tag-changed);       border-color: var(--tag-changed);       background: var(--tag-changed-bg); }
+    .pill.attribute-changed { color: var(--attribute-changed); border-color: var(--attribute-changed); background: var(--attribute-changed-bg); }
+    .pill.text-changed      { color: var(--text-changed);      border-color: var(--text-changed);      background: var(--text-changed-bg); }
+    .pill.grown             { color: var(--grown);             border-color: var(--grown);             background: var(--grown-bg); }
+    .pill.shrunk            { color: var(--shrunk);            border-color: var(--shrunk);            background: var(--shrunk-bg); }
+    .pill.depth-changed     { color: var(--depth-changed);     border-color: var(--depth-changed);     background: var(--depth-changed-bg); }
 
     .section-label {
       font-size: 10px;
@@ -199,6 +221,12 @@ export class HTMLDiffReporter implements DiffReporter {
     .badge.DELETED    { color: var(--deleted);    background: var(--deleted-bg);    border: 1px solid var(--deleted); }
     .badge.REORDERED  { color: var(--reordered);  background: var(--reordered-bg);  border: 1px solid var(--reordered); }
     .badge.REPARENTED { color: var(--reparented); background: var(--reparented-bg); border: 1px solid var(--reparented); }
+    .badge.TAG_CHANGED       { color: var(--tag-changed);       background: var(--tag-changed-bg);       border: 1px solid var(--tag-changed); }
+    .badge.ATTRIBUTE_CHANGED { color: var(--attribute-changed); background: var(--attribute-changed-bg); border: 1px solid var(--attribute-changed); }
+    .badge.TEXT_CHANGED      { color: var(--text-changed);      background: var(--text-changed-bg);      border: 1px solid var(--text-changed); }
+    .badge.GROWN             { color: var(--grown);             background: var(--grown-bg);             border: 1px solid var(--grown); }
+    .badge.SHRUNK            { color: var(--shrunk);            background: var(--shrunk-bg);            border: 1px solid var(--shrunk); }
+    .badge.DEPTH_CHANGED     { color: var(--depth-changed);     background: var(--depth-changed-bg);     border: 1px solid var(--depth-changed); }
 
     .card-title {
       color: var(--text-bright);
@@ -331,7 +359,7 @@ export class HTMLDiffReporter implements DiffReporter {
   </header>
 
   <div class="summary">
-    ${this.summaryPills(counts)}
+    ${HTMLDiffReporter._summaryPills(counts)}
   </div>
 
   <div class="section-label">${diffPoints.length} change${diffPoints.length !== 1 ? "s" : ""} detected</div>
@@ -358,9 +386,9 @@ export class HTMLDiffReporter implements DiffReporter {
 </html>`;
   }
 
-  private card(point: DiffPoint<string>): string {
+  private static _card(point: DiffPoint<string>): string {
     const node = point.referenceNode ?? point.targetNode;
-    const title = this.nodeLabel(node);
+    const title = HTMLDiffReporter._nodeLabel(node);
     const baseMeta = node
       ? `depth ${node.depth} · child ${node.nthChild}/${node.siblingCount}`
       : "";
@@ -369,16 +397,16 @@ export class HTMLDiffReporter implements DiffReporter {
       point.type === "REPARENTED"
         ? `<div class="move-summary">
              <span class="move-arrow">FROM</span>
-             <span>${this.nodeLabel(point.referenceParentNode ?? null)}</span>
+             <span>${HTMLDiffReporter._nodeLabel(point.referenceParentNode ?? null)}</span>
              <span class="move-arrow">TO</span>
-             <span>${this.nodeLabel(point.targetParentNode ?? null)}</span>
+             <span>${HTMLDiffReporter._nodeLabel(point.targetParentNode ?? null)}</span>
            </div>`
         : "";
     const parentPanels =
       point.type === "REPARENTED"
         ? `<div class="panels">
-             ${this.panel("ref", "Reference Parent", point.referenceParentNode ?? null)}
-             ${this.panel("tgt", "Target Parent", point.targetParentNode ?? null)}
+             ${HTMLDiffReporter._panel("ref", "Reference Parent", point.referenceParentNode ?? null)}
+             ${HTMLDiffReporter._panel("tgt", "Target Parent", point.targetParentNode ?? null)}
            </div>`
         : "";
 
@@ -393,25 +421,25 @@ export class HTMLDiffReporter implements DiffReporter {
   <div class="card-body">
     ${parentSummary}
     <div class="panels">
-      ${this.panel("ref", "Reference", point.referenceNode)}
-      ${this.panel("tgt", "Target", point.targetNode)}
+      ${HTMLDiffReporter._panel("ref", "Reference", point.referenceNode)}
+      ${HTMLDiffReporter._panel("tgt", "Target", point.targetNode)}
     </div>
     ${parentPanels}
   </div>
 </div>`;
   }
 
-  private nodeLabel(node: ContextNode | null): string {
+  private static _nodeLabel(node: ContextNode | null): string {
     if (!node) return "—";
 
-    const attributes = Object.entries(node.attribute ?? {})
-      .map(([name, value]) => `${name}="${value}"`)
+    const attributes = Object.entries(node.attributeAnalytic)
+      .map(([name, v]) => `${name}="${v.actualValue}"`)
       .join(" ");
 
     return `&lt;${node.tagName}${attributes ? ` ${attributes}` : ""}&gt;`;
   }
 
-  private panel(
+  private static _panel(
     cls: "ref" | "tgt",
     label: string,
     node: ContextNode | null,
@@ -420,14 +448,22 @@ export class HTMLDiffReporter implements DiffReporter {
       return /* html */ `
 <div class="panel">
   <div class="panel-label none">${label} — none</div>
-  <div class="empty">not present in this snapshot</div>
+  <div class="empty">not present in HTMLDiffReporter snapshot</div>
 </div>`;
     }
 
     const attrEntries =
-      Object.entries(node.attributeFingerprints)
+      Object.entries(node.attributeAnalytic)
         .map(([k, v]) => `${k}: {n:${v.numberOfValues}, len:${v.totalLength}}`)
         .join(", ") || "—";
+
+    const textPreview = node.directText
+      ? `"${node.directText.slice(0, 60)}${node.directText.length > 60 ? "..." : ""}"`
+      : "—";
+
+    const parentSurface = node.parentTagName
+      ? `tag:${node.parentTagName} attrs:${node.parentAttributeCount} depth:${node.parentDepth}`
+      : "—";
 
     return /* html */ `
 <div class="panel">
@@ -435,45 +471,45 @@ export class HTMLDiffReporter implements DiffReporter {
   <div class="panel-body">
     <div class="field">
       <div class="field-key">tag</div>
-      <div class="field-val">${this.nodeLabel(node)}</div>
+      <div class="field-val">${HTMLDiffReporter._nodeLabel(node)}</div>
     </div>
     <div class="field">
       <div class="field-key">position</div>
-      <div class="field-val">depth ${node.depth} · nthChild ${node.nthChild} · siblings ${node.siblingCount}</div>
+      <div class="field-val">depth ${node.depth} | nth ${node.nthChild} | siblings ${node.siblingCount}</div>
     </div>
     <div class="field">
       <div class="field-key">size</div>
-      <div class="field-val">children ${node.childCount} · height ${node.height}</div>
+      <div class="field-val">children ${node.childCount} | height ${node.height}</div>
     </div>
     <div class="field">
       <div class="field-key">directText</div>
-      <div class="field-val">${node.directText ? `"${node.directText.slice(0, 60)}${node.directText.length > 60 ? "..." : ""}"` : "—"}</div>
+      <div class="field-val">${textPreview}</div>
     </div>
     <div class="field">
-      <div class="field-key">attributeFingerprints (${node.attributeCount})</div>
+      <div class="field-key">attributeAnalytic (${node.attributeCount})</div>
       <div class="field-val sig">${attrEntries}</div>
     </div>
     <div class="field">
-      <div class="field-key">nodeSignature</div>
-      <div class="field-val sig">${node.nodeSignature}</div>
+      <div class="field-key">surface</div>
+      <div class="field-val sig">tag:${node.tagName} | attrs:${node.attributeCount} | text:${node.directTextHash.slice(0, 12)}</div>
     </div>
     <div class="field">
-      <div class="field-key">innerSignature</div>
-      <div class="field-val sig">${node.innerSignature}</div>
+      <div class="field-key">inner</div>
+      <div class="field-val sig">height:${node.height} | children:${node.childCount}</div>
     </div>
     <div class="field">
-      <div class="field-key">positioningSignature</div>
-      <div class="field-val sig">${node.positioningSignature}</div>
+      <div class="field-key">positioning</div>
+      <div class="field-val sig">depth:${node.depth} | nth:${node.nthChild} | siblings:${node.siblingCount}</div>
     </div>
     <div class="field">
-      <div class="field-key">parentSignature</div>
-      <div class="field-val sig">${node.parentSignature ?? "—"}</div>
+      <div class="field-key">parentSurface</div>
+      <div class="field-val sig">${parentSurface}</div>
     </div>
   </div>
 </div>`;
   }
 
-  private counts(points: DiffPoint<string>[]): Record<string, number> {
+  private static _counts(points: DiffPoint<string>[]): Record<string, number> {
     return points.reduce(
       (acc, p) => {
         acc[p.type] = (acc[p.type] ?? 0) + 1;
@@ -483,18 +519,11 @@ export class HTMLDiffReporter implements DiffReporter {
     );
   }
 
-  private summaryPills(counts: Record<string, number>): string {
-    const map: Record<string, string> = {
-      ADDED: "added",
-      DELETED: "deleted",
-      REORDERED: "reordered",
-      REPARENTED: "reparented",
-    };
-
+  private static _summaryPills(counts: Record<string, number>): string {
     return Object.entries(counts)
       .map(
         ([type, count]) => /* html */ `
-        <div class="pill ${map[type] ?? ""}">
+        <div class="pill ${type.toLowerCase().replace(/_/g, "-")}">
           <span class="pill-count">${count}</span>
           ${type.replace(/_/g, " ")}
         </div>`,
