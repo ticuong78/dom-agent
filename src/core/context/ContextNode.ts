@@ -1,4 +1,7 @@
+import type { ISerializable } from "@core/interface";
+
 export type ValueType = {
+  // full primitive
   actualValue: string;
   numberOfValues: number;
   totalLength: number;
@@ -42,7 +45,26 @@ export type ContextNodeParams = {
   parentDepth: number | null;
 };
 
-export class ContextNode {
+export type ContextNodeSnapshot = {
+  id: string;
+  tagName: string;
+  attributeAnalytic: Record<string, ValueType>;
+  attributeCount: number;
+  directText: string;
+  directTextHash: string;
+  depth: number;
+  nthChild: number;
+  siblingCount: number;
+  height: number;
+  childCount: number;
+  parentTagName: string | null;
+  parentAttributeCount: number | null;
+  parentDepth: number | null;
+  parentId: string | null;
+  childIds: string[];
+};
+
+export class ContextNode implements ISerializable {
   readonly id: string;
   readonly tagName: string; //  need to be considered
   readonly attributeAnalytic: Record<string, ValueType>; //  need to be considered
@@ -82,21 +104,29 @@ export class ContextNode {
     this.parentAttributeCount = params.parentAttributeCount;
     this.parentDepth = params.parentDepth;
   }
-}
 
-export class ContextNodeSerializer {
-  static serialize(contextNode: ContextNode): ContextNodeSerialized {
-    throw new Error("Not implemented");
+  /**
+   * Flattens a ContextNode into a plain object with no circular
+   * references. Pointers (parent, siblings, children) become ids.
+   */
+  serialize(): ContextNodeSnapshot {
+    return {
+      id: this.id,
+      tagName: this.tagName,
+      attributeAnalytic: this.attributeAnalytic,
+      attributeCount: this.attributeCount,
+      directText: this.directText,
+      directTextHash: this.directTextHash,
+      depth: this.depth,
+      nthChild: this.nthChild,
+      siblingCount: this.siblingCount,
+      height: this.height,
+      childCount: this.childCount,
+      parentTagName: this.parentTagName,
+      parentAttributeCount: this.parentAttributeCount,
+      parentDepth: this.parentDepth,
+      parentId: this.parent?.id ?? null,
+      childIds: this.children.map((c) => c.id),
+    };
   }
 }
-
-export type ContextNodeSerialized = Omit<
-  ContextNode,
-  "parent" | "nextSibling" | "previousSibling" | "children"
-> & {
-  parentId: string | null;
-  nextSiblingId: string | null;
-  previousSiblingId: string | null;
-  childIds: string[];
-  capturedAt: string;
-};
