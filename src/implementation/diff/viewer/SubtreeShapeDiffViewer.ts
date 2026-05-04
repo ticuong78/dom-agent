@@ -1,5 +1,5 @@
 import type { ContextNode, ContextTree } from "@core/context";
-import type { DiffPoint, DiffType, DiffViewer } from "@core/diff";
+import { DiffPoint, type DiffType, type DiffViewer } from "@core/diff";
 import type { Comparer } from "@core/compare/Comparer";
 
 export type SubtreeShapeDiffType =
@@ -23,9 +23,7 @@ export type SubtreeShapeDiffType =
  * A single matched pair can emit multiple diff types (e.g. both
  * GROWN and DEPTH_CHANGED if children were added at a new depth).
  */
-export class SubtreeShapeDiffViewer
-  implements DiffViewer<SubtreeShapeDiffType>
-{
+export class SubtreeShapeDiffViewer implements DiffViewer<SubtreeShapeDiffType> {
   private comparer: Comparer;
 
   constructor(comparer: Comparer) {
@@ -48,11 +46,11 @@ export class SubtreeShapeDiffViewer
     }
 
     for (const r of referenceOnly) {
-      points.push({ type: "DELETED", referenceNode: r, targetNode: null });
+      points.push(new DiffPoint<SubtreeShapeDiffType>("DELETED", r, null));
     }
 
     for (const t of targetOnly) {
-      points.push({ type: "ADDED", referenceNode: null, targetNode: t });
+      points.push(new DiffPoint<SubtreeShapeDiffType>("ADDED", null, t));
     }
 
     return points;
@@ -65,28 +63,40 @@ export class SubtreeShapeDiffViewer
     const points: DiffPoint<SubtreeShapeDiffType>[] = [];
 
     if (t.childCount > r.childCount) {
-      points.push({
-        type: "GROWN",
-        referenceNode: r,
-        targetNode: t,
-        delta: t.childCount - r.childCount,
-      });
+      points.push(
+        new DiffPoint<SubtreeShapeDiffType>(
+          "GROWN",
+          r,
+          t,
+          null,
+          null,
+          t.childCount - r.childCount,
+        ),
+      );
     } else if (t.childCount < r.childCount) {
-      points.push({
-        type: "SHRUNK",
-        referenceNode: r,
-        targetNode: t,
-        delta: r.childCount - t.childCount,
-      });
+      points.push(
+        new DiffPoint<SubtreeShapeDiffType>(
+          "SHRUNK",
+          r,
+          t,
+          null,
+          null,
+          r.childCount - t.childCount,
+        ),
+      );
     }
 
     if (r.height !== t.height) {
-      points.push({
-        type: "DEPTH_CHANGED",
-        referenceNode: r,
-        targetNode: t,
-        delta: t.height - r.height,
-      });
+      points.push(
+        new DiffPoint<SubtreeShapeDiffType>(
+          "DEPTH_CHANGED",
+          r,
+          t,
+          null,
+          null,
+          t.height - r.height,
+        ),
+      );
     }
 
     return points;

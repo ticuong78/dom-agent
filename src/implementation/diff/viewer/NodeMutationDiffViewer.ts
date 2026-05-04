@@ -1,6 +1,6 @@
 import type { ContextNode, ContextTree } from "@core/context";
 import type { ValueType } from "@core/context/ContextNode";
-import type { DiffPoint, DiffType, DiffViewer } from "@core/diff";
+import { DiffPoint, type DiffType, type DiffViewer } from "@core/diff";
 import type { Comparer } from "@core/compare/Comparer";
 
 export type NodeMutationDiffType =
@@ -23,9 +23,7 @@ export type NodeMutationDiffType =
  * A single matched pair can emit multiple diff types (e.g. both
  * TAG_CHANGED and TEXT_CHANGED if both changed simultaneously).
  */
-export class NodeMutationDiffViewer
-  implements DiffViewer<NodeMutationDiffType>
-{
+export class NodeMutationDiffViewer implements DiffViewer<NodeMutationDiffType> {
   private comparer: Comparer;
 
   constructor(comparer: Comparer) {
@@ -48,11 +46,11 @@ export class NodeMutationDiffViewer
     }
 
     for (const r of referenceOnly) {
-      points.push({ type: "DELETED", referenceNode: r, targetNode: null });
+      points.push(new DiffPoint<NodeMutationDiffType>("DELETED", r, null));
     }
 
     for (const t of targetOnly) {
-      points.push({ type: "ADDED", referenceNode: null, targetNode: t });
+      points.push(new DiffPoint<NodeMutationDiffType>("ADDED", null, t));
     }
 
     return points;
@@ -65,20 +63,24 @@ export class NodeMutationDiffViewer
     const points: DiffPoint<NodeMutationDiffType>[] = [];
 
     if (r.tagName !== t.tagName) {
-      points.push({ type: "TAG_CHANGED", referenceNode: r, targetNode: t });
+      points.push(new DiffPoint<NodeMutationDiffType>("TAG_CHANGED", r, t));
     }
 
     if (this.attributesChanged(r, t)) {
-      points.push({
-        type: "ATTRIBUTE_CHANGED",
-        referenceNode: r,
-        targetNode: t,
-        delta: Math.abs(r.attributeCount - t.attributeCount),
-      });
+      points.push(
+        new DiffPoint<NodeMutationDiffType>(
+          "ATTRIBUTE_CHANGED",
+          r,
+          t,
+          null,
+          null,
+          Math.abs(r.attributeCount - t.attributeCount),
+        ),
+      );
     }
 
     if (r.directTextHash !== t.directTextHash) {
-      points.push({ type: "TEXT_CHANGED", referenceNode: r, targetNode: t });
+      points.push(new DiffPoint<NodeMutationDiffType>("TEXT_CHANGED", r, t));
     }
 
     return points;
