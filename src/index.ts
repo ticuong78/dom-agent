@@ -3,12 +3,17 @@ import { SHA256HashAdapter } from "@adapters/hash";
 import { UUIDAdapter } from "@adapters/id";
 import { HTMLToContextConverter } from "@implementation/converter/HTMLToContextConverter";
 import { CompareRule } from "@core/compare/CompareRule";
-import { RuleBasedComparer, type GroupKeyFn } from "@implementation/compare/RuleBasedComparer";
+import {
+  RuleBasedComparer,
+  type GroupKeyFn,
+} from "@implementation/compare/RuleBasedComparer";
 import { TreeHierarchyDiffViewer } from "@implementation/diff/viewer/TreeHierarchyDiffViewer";
 import { NodeMutationDiffViewer } from "@implementation/diff/viewer/NodeMutationDiffViewer";
 import { SubtreeShapeDiffViewer } from "@implementation/diff/viewer/SubtreeShapeDiffViewer";
 import { HTMLDiffReporter } from "@implementation/diff/reporter/HTMLDiffReporter";
 import { JSONDiffReporter } from "@implementation/diff/reporter/JSONDiffReporter";
+import { DiffReport } from "@core/diff";
+import { DeepSpaceTheme } from "@implementation/theme/DeepSpaceTheme";
 
 // ─── V1: Reference snapshot ─────────────────────────────────
 const html = `
@@ -198,18 +203,24 @@ for (const d of hierarchyDiffs) {
   const ref = d.referenceNode;
   const tar = d.targetNode;
   const label = (n: typeof ref) =>
-    n ? `${n.tagName}.${n.attributeAnalytic?.class?.actualValue ?? "?"}` : "---";
+    n
+      ? `${n.tagName}.${n.attributeAnalytic?.class?.actualValue ?? "?"}`
+      : "---";
   console.log(`  ${d.type}: ${label(ref)} -> ${label(tar)}`);
 }
 
 console.log("\n=== NodeMutationDiffViewer ===");
-console.log("  (expects: TAG_CHANGED, ATTRIBUTE_CHANGED, TEXT_CHANGED, ADDED, DELETED)");
+console.log(
+  "  (expects: TAG_CHANGED, ATTRIBUTE_CHANGED, TEXT_CHANGED, ADDED, DELETED)",
+);
 const mutationDiffs = mutationViewer.highlight(treeV1!, treeV2!);
 for (const d of mutationDiffs) {
   const ref = d.referenceNode;
   const tar = d.targetNode;
   const label = (n: typeof ref) =>
-    n ? `${n.tagName}.${n.attributeAnalytic?.class?.actualValue ?? "?"}` : "---";
+    n
+      ? `${n.tagName}.${n.attributeAnalytic?.class?.actualValue ?? "?"}`
+      : "---";
   console.log(`  ${d.type}: ${label(ref)} -> ${label(tar)}`);
 }
 
@@ -220,14 +231,30 @@ for (const d of shapeDiffs) {
   const ref = d.referenceNode;
   const tar = d.targetNode;
   const label = (n: typeof ref) =>
-    n ? `${n.tagName}.${n.attributeAnalytic?.class?.actualValue ?? "?"}` : "---";
-  console.log(`  ${d.type} (delta=${d.delta ?? 0}): ${label(ref)} -> ${label(tar)}`);
+    n
+      ? `${n.tagName}.${n.attributeAnalytic?.class?.actualValue ?? "?"}`
+      : "---";
+  console.log(
+    `  ${d.type} (delta=${d.delta ?? 0}): ${label(ref)} -> ${label(tar)}`,
+  );
 }
 
+// ─── DiffReport ──────────────────────────────────────────────
+
+const shapeDiffReport = new DiffReport(shapeDiffs, "Shape Diff");
+const mutationDiffReport = new DiffReport(mutationDiffs, "Mutation Diff");
+const hierarchyDiffReport = new DiffReport(hierarchyDiffs, "Hierarchy Diff");
+
 // ─── Reports ─────────────────────────────────────────────────
-HTMLDiffReporter.report(hierarchyDiffs, "report/hierarchyDiffs.html");
-HTMLDiffReporter.report(mutationDiffs, "report/mutationDiffs.html");
-HTMLDiffReporter.report(shapeDiffs, "report/shapeDiffs.html");
-JSONDiffReporter.report(hierarchyDiffs, "report/hierarchyDiffs.json");
-JSONDiffReporter.report(mutationDiffs, "report/mutationDiffs.json");
-JSONDiffReporter.report(shapeDiffs, "report/shapeDiffs.json");
+const deepSpace = new DeepSpaceTheme();
+
+// ─── Reports ─────────────────────────────────────────────────
+const hTMLDiffReporter = new HTMLDiffReporter(deepSpace);
+const jSONDiffReporter = new JSONDiffReporter();
+
+hTMLDiffReporter.report(hierarchyDiffReport, "report/hierarchyDiffs.html");
+hTMLDiffReporter.report(mutationDiffReport, "report/mutationDiffs.html");
+hTMLDiffReporter.report(shapeDiffReport, "report/shapeDiffs.html");
+jSONDiffReporter.report(hierarchyDiffReport, "report/hierarchyDiffs.json");
+jSONDiffReporter.report(mutationDiffReport, "report/mutationDiffs.json");
+jSONDiffReporter.report(shapeDiffReport, "report/shapeDiffs.json");
