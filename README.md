@@ -134,7 +134,7 @@ Detects subtree structure changes using inner properties:
 
 No single viewer covers every scenario — and that's by design. Each viewer declares its lens, has its own preconditions, and emits its own diff types. When you composite them, conflicts between viewers become higher-fidelity signals than either verdict alone.
 
-A node that `TreeHierarchyDiffViewer` calls REPARENTED but `NodeMutationDiffViewer` also flags as ATTRIBUTE_CHANGED tells you more than either verdict in isolation: the node moved _and_ was modified in transit.
+A node that `TreeHierarchyDiffViewer` calls REPARENTED but `NodeMutationDiffViewer` also flags as ATTRIBUTE*CHANGED tells you more than either verdict in isolation: the node moved \_and* was modified in transit.
 
 ### DiffReporter
 
@@ -167,14 +167,17 @@ dom-sentinel/
 │   │   ├── converter/                # Converter interface
 │   │   ├── crypto/                   # HashAdapter, IDAdapter interfaces
 │   │   ├── diff/                     # DiffPoint, DiffViewer, DiffReporter
-│   │   └── plain/                    # HTMLNode, HTMLAdapter interfaces
+│   │   ├── plain/                    # HTMLNode, HTMLAdapter interfaces
+│   │   ├── interface/                # Characteristic-like interfaces
+│   │   └── renderer/                 # Renderr interface
 │   │
 │   ├── implementation/               # Concrete strategies
 │   │   ├── compare/                  # RuleBasedComparer
 │   │   ├── converter/                # HTMLToContextConverter
 │   │   └── diff/
 │   │       ├── viewer/               # TreeHierarchy, NodeMutation, SubtreeShape
-│   │       └── reporter/             # HTMLDiffReporter, JSONDiffReporter
+│   │       ├── reporter/             # HTMLDiffReporter, JSONDiffReporter
+│   │       └── theme/                # DashboardLikeTheme, DeepSpaceTheme
 │   │
 │   ├── adapters/                     # Third-party wrappers
 │   │   ├── atom/                     # CheerioAdapter (HTML parsing)
@@ -186,8 +189,7 @@ dom-sentinel/
 ├── tests/
 │   └── unit/                         # Unit tests (vitest)
 │
-├── report/                           # Generated diff reports (HTML + JSON)
-└── artifacts/                        # Sample HTML files for testing
+└── report/                           # Generated diff reports (HTML + JSON)
 ```
 
 ---
@@ -197,6 +199,7 @@ dom-sentinel/
 ```bash
 npm install
 npm run dev
+start report/hierarchyDiffs.html
 ```
 
 This runs the demo in `src/index.ts`, which:
@@ -205,6 +208,7 @@ This runs the demo in `src/index.ts`, which:
 2. Converts them to `ContextTree` structures
 3. Runs three DiffViewers with tailored Comparers
 4. Outputs diff results to console and generates reports in `report/`
+5. Displays HTML-like diff results on a browser
 
 ### Programmatic Usage
 

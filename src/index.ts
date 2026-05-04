@@ -14,7 +14,6 @@ import { HTMLDiffReporter } from "@implementation/diff/reporter/HTMLDiffReporter
 import { JSONDiffReporter } from "@implementation/diff/reporter/JSONDiffReporter";
 import { DiffReport } from "@core/diff";
 import { DeepSpaceTheme } from "@implementation/theme/DeepSpaceTheme";
-import { DashboardLikeTheme } from "@implementation/theme/DashboardLikeTheme";
 
 // ─── V1: Reference snapshot ─────────────────────────────────
 const html = `
@@ -247,7 +246,7 @@ const mutationDiffReport = new DiffReport(mutationDiffs, "Mutation Diff");
 const hierarchyDiffReport = new DiffReport(hierarchyDiffs, "Hierarchy Diff");
 
 // ─── Reports ─────────────────────────────────────────────────
-const deepSpace = new DashboardLikeTheme();
+const deepSpace = new DeepSpaceTheme();
 
 // ─── Reports ─────────────────────────────────────────────────
 const hTMLDiffReporter = new HTMLDiffReporter(deepSpace);
