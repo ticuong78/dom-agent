@@ -94,8 +94,7 @@ export class CompareRule {
     const bKeys = Object.keys(b).sort();
 
     const keysEqual =
-      aKeys.length === bKeys.length &&
-      aKeys.every((k, i) => k === bKeys[i]);
+      aKeys.length === bKeys.length && aKeys.every((k, i) => k === bKeys[i]);
 
     if (matchType === "keys_match") return keysEqual;
 
@@ -103,7 +102,7 @@ export class CompareRule {
     const sharedKeys = aKeys.filter((k) => k in b);
     const valuesEqual =
       sharedKeys.length > 0 &&
-      sharedKeys.every((k) => a[k].actualValue === b[k].actualValue);
+      sharedKeys.every((k) => a[k]!.actualValue === b[k]!.actualValue);
 
     if (matchType === "values_match") return valuesEqual;
 

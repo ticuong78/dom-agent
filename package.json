@@ -1,4 +1,5 @@
 {
+  "name": "dom-agent",
   "author": {
     "name": "Harry Lee",
     "email": "lephamhungcuong219@gmail.com",
@@ -7,19 +8,20 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
-  "bin": {
-    "dom-sentinel": "dist/cli/index.js"
-  },
   "description": "Monitors DOM structure changes on target websites to protect web scraping pipelines from breaking silently.",
   "keywords": [
     "dom",
-    "web-scraping",
-    "monitoring",
-    "change-detaction",
+    "dom-diff",
+    "html-diff",
+    "change-detection",
+    "ui-regression",
+    "regression-testing",
+    "test-automation",
     "playwright",
-    "developer-tools",
-    "scraper",
-    "crawler"
+    "dom-analysis",
+    "html-analysis",
+    "page-monitoring",
+    "developer-tools"
   ],
   "devDependencies": {
     "@types/node": "^25.6.0",
@@ -28,13 +30,16 @@
     "typescript": "^6.0.3",
     "vitest": "^4.1.5"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "license": "MIT",
   "dependencies": {
-    "cheerio": "^1.2.0",
-    "puppeteer": "^24.42.0",
-    "puppeteer-extra": "^3.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2"
+    "cheerio": "^1.2.0"
   },
+  "funding": "https://github.com/sponsors/ticuong78",
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
