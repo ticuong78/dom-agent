@@ -6,4 +6,4 @@
 4. Add DiffPoints name. DONE
 5. Snapshotting system, snapshot serializer. DONE
 6. Add snapshotting to ContextTree.
-7. Perform live demo and analytic on real commercial websites in a period (most likely 7 days)
+7. Perform live demo and analytic on real commercial websites in a period (most likely 7 days). Do this after creating dom-agent-cli
