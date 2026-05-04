@@ -1,7 +1,11 @@
 import { analyzeAttributes, ContextNode, type ValueType } from "@core/context";
-import { type HashAdapter, type IDAdapter, type HTMLNode } from "../../core";
 
-import { ContextTree } from "../../core";
+import {
+  ContextTree,
+  type HashAdapter,
+  type HTMLNode,
+  type IDAdapter,
+} from "../../core";
 
 type ParentSurface = {
   tagName: string;
