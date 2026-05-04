@@ -1,4 +1,4 @@
-# dom-sentinel
+# dom-agent
 
 **Monitors DOM structure changes on target websites to protect web scraping pipelines from breaking silently.**
 
@@ -14,7 +14,7 @@ Most solutions throw machine learning at this: training models to recognize "sim
 
 ## The Solution
 
-dom-sentinel takes a different approach. It decomposes every DOM node into a set of scalar properties — tag name, attribute structure, depth, child count, subtree height, parent surface — and compares them field-by-field using configurable rules. No hashing. No embeddings. No black boxes.
+dom-agent takes a different approach. It decomposes every DOM node into a set of scalar properties — tag name, attribute structure, depth, child count, subtree height, parent surface — and compares them field-by-field using configurable rules. No hashing. No embeddings. No black boxes.
 
 The result: fast, explainable, deterministic change detection that tells you exactly _what_ changed, _how_ it changed, and _where_ it changed — in terms you can act on programmatically.
 
@@ -22,7 +22,7 @@ The result: fast, explainable, deterministic change detection that tells you exa
 
 ## Architecture
 
-dom-sentinel follows a hexagonal (ports-and-adapters) architecture with three clean layers:
+dom-agent follows a hexagonal (ports-and-adapters) architecture with three clean layers:
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -56,7 +56,7 @@ The atomic unit. Every HTML element is converted into a `ContextNode` carrying d
 | **Text**           | `directText`, `directTextHash`                         | The node's own text content (not children's)  |
 | **Parent Surface** | `parentTagName`, `parentAttributeCount`, `parentDepth` | The parent's identity, propagated to children |
 
-These properties replace the traditional monolithic hash signature. Instead of comparing two opaque strings, dom-sentinel compares individual fields — so when a match fails, you know _which_ property diverged.
+These properties replace the traditional monolithic hash signature. Instead of comparing two opaque strings, dom-agent compares individual fields — so when a match fails, you know _which_ property diverged.
 
 ### CompareRule
 
@@ -159,7 +159,7 @@ This theming layer keeps presentation separate from the core diffing logic, maki
 ## Folder Structure
 
 ```
-dom-sentinel/
+dom-agent/
 ├── src/
 │   ├── core/                         # Interfaces & types (no implementations)
 │   │   ├── compare/                  # CompareRule, CompareRuleManager, Comparer
@@ -258,7 +258,7 @@ for (const diff of diffs) {
 
 ### Decomposed Signatures over Monolithic Hashes
 
-Traditional DOM diffing hashes node properties into a single string signature. When two hashes don't match, you know _something_ changed but not _what_. dom-sentinel keeps every property as a separate comparable field. The comparison is faster (scalar checks short-circuit before touching all fields) and the output is more informative (you see exactly which property diverged).
+Traditional DOM diffing hashes node properties into a single string signature. When two hashes don't match, you know _something_ changed but not _what_. dom-agent keeps every property as a separate comparable field. The comparison is faster (scalar checks short-circuit before touching all fields) and the output is more informative (you see exactly which property diverged).
 
 ### Rules over Algorithms
 
