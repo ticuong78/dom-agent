@@ -35,8 +35,6 @@
       "@core/*": ["./src/core/*"],
       "@adapters/*": ["./src/adapters/*"],
       "@implementation/*": ["./src/implementation/*"],
-      "@browser/*": ["./src/browser/*"],
-      "@cli/*": ["./src/cli/*"],
       "@tests/*": ["./tests/*"]
     }
   },
