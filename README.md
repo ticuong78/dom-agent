@@ -1,6 +1,6 @@
 <div align="center">
 
-# dom-sentinel
+# dom-agent
 
 **Pure-algorithmic DOM change detection. No AI. No ML. No black boxes.**
 
@@ -24,7 +24,7 @@ Most solutions throw machine learning at this: embeddings, visual diffing, train
 
 ## The Solution
 
-dom-sentinel decomposes every DOM node into scalar properties — tag name, attribute structure, depth, child count, subtree height, parent surface — and compares them field-by-field using configurable rules. Fast, explainable, deterministic.
+dom-agent decomposes every DOM node into scalar properties — tag name, attribute structure, depth, child count, subtree height, parent surface — and compares them field-by-field using configurable rules. Fast, explainable, deterministic.
 
 When a match fails, you know _which_ property diverged, _how_ it changed, and _where_ it happened.
 
@@ -90,7 +90,7 @@ for (const diff of diffs) {
 
 ## Architecture
 
-dom-sentinel follows a hexagonal (ports-and-adapters) architecture:
+dom-agent follows a hexagonal (ports-and-adapters) architecture:
 
 ```
  core/               Interfaces, types, contracts
@@ -114,7 +114,7 @@ Every HTML element becomes a `ContextNode` with decomposed scalar properties:
 | **Text**        | `directText`, `directTextHash`                         | The node's own text content |
 | **Parent**      | `parentTagName`, `parentAttributeCount`, `parentDepth` | Parent identity, propagated |
 
-Instead of comparing two opaque hashes, dom-sentinel compares individual fields — when a match fails, you know exactly which property diverged.
+Instead of comparing two opaque hashes, dom-agent compares individual fields — when a match fails, you know exactly which property diverged.
 
 ### CompareRule
 
@@ -188,7 +188,7 @@ Two built-in themes for HTML reports: **DeepSpaceTheme** (dark, dashboard-like) 
 ## Folder Structure
 
 ```
-dom-sentinel/
+dom-agent/
   src/
     core/                   Interfaces & types only
       compare/              CompareRule, CompareRuleManager, Comparer
@@ -220,7 +220,7 @@ dom-sentinel/
 
 ## Design Philosophy
 
-**Decomposed signatures over monolithic hashes.** When two hashes don't match, you know _something_ changed but not _what_. dom-sentinel keeps every property as a separate comparable field. Comparison short-circuits early, output tells you exactly which field diverged.
+**Decomposed signatures over monolithic hashes.** When two hashes don't match, you know _something_ changed but not _what_. dom-agent keeps every property as a separate comparable field. Comparison short-circuits early, output tells you exactly which field diverged.
 
 **Rules over algorithms.** The CompareRule system makes matching criteria a configuration choice, not a code change. Monitoring a login form? Match by `tagName + id`. Product listing? `tagName + depth + class`.
 

@@ -1,6 +1,6 @@
 # Commercial License
 
-dom-sentinel is dual-licensed. The open-source version is available under
+dom-agent is dual-licensed. The open-source version is available under
 the GNU General Public License v3.0 (GPL-3.0).
 
 For use in proprietary or closed-source software without GPL obligations,
