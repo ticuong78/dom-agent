@@ -32,8 +32,16 @@ When a match fails, you know _which_ property diverged, _how_ it changed, and _w
 
 ## Install
 
+If you use [npm](https://www.npmjs.com/) as the main package manager, please type:
+
 ```bash
 npm install @ticuong78/dom-agent
+```
+
+Otherwise, if you are using the same package manager as this project does - [yarn](https://yarnpkg.com/), please type:
+
+```bash
+yarn add @ticuong78/dom-agent
 ```
 
 ## Quick Start
@@ -224,6 +232,8 @@ dom-sentinel/
 
 ## Scripts
 
+If you are using [npm](https://www.npmjs.com/), please type:
+
 ```bash
 npm run build          # Compile for publishing
 npm run dev            # Run demo
@@ -231,6 +241,17 @@ npm test               # All tests
 npm run test:unit      # Unit tests only
 npm run test:coverage  # With coverage
 npm run test:watch     # Watch mode
+```
+
+Otherwise using this for [yarn](https://yarnpkg.com/), please type:
+
+```bash
+yarn build          # Compile for publishing
+yarn dev            # Run demo
+yarn test               # All tests
+yarn test:unit      # Unit tests only
+yarn test:coverage  # With coverage
+yarn test:watch     # Watch mode
 ```
 
 ## Tech Stack
