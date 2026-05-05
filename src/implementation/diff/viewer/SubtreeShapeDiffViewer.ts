@@ -2,6 +2,14 @@ import type { ContextNode, ContextTree } from "@core/context";
 import { DiffPoint, type DiffType, type DiffViewer } from "@core/diff";
 import type { Comparer } from "@core/compare/Comparer";
 
+/**
+ * Extended diff types emitted by {@link SubtreeShapeDiffViewer}.
+ *
+ * - `"ADDED"` / `"DELETED"` — base types
+ * - `"GROWN"` — the node gained children (delta = number of children added)
+ * - `"SHRUNK"` — the node lost children (delta = number of children removed)
+ * - `"DEPTH_CHANGED"` — the subtree became deeper or shallower (delta = height difference)
+ */
 export type SubtreeShapeDiffType =
   | DiffType
   | "GROWN"
@@ -9,27 +17,48 @@ export type SubtreeShapeDiffType =
   | "DEPTH_CHANGED";
 
 /**
- * SubtreeShapeDiffViewer — inner-lens viewer.
+ * An inner-lens {@link DiffViewer} that detects changes in subtree structure.
  *
- * Detects when a matched node's subtree structure changed: children
- * added or removed (GROWN/SHRUNK), or the subtree became deeper or
- * shallower (DEPTH_CHANGED).
+ * For each matched node pair, checks whether children were added/removed
+ * (GROWN/SHRUNK) or whether the subtree depth changed (DEPTH_CHANGED).
+ * A single pair can emit multiple diff types.
  *
- * Precondition: works best when nodes have stable surface identity
- * (tagName + attributes) so the Comparer can match them by what they
- * ARE rather than where they sit. If surface properties also changed,
- * pair with a NodeMutationDiffViewer for the full picture.
+ * **Best used when:** you want to detect container-level changes —
+ * lists gaining items, sections collapsing, trees growing new branches.
  *
- * A single matched pair can emit multiple diff types (e.g. both
- * GROWN and DEPTH_CHANGED if children were added at a new depth).
+ * **Precondition:** works best when nodes have stable surface identity
+ * (tagName + attributes) so the {@link Comparer} can match them by what
+ * they ARE rather than where they sit.
+ *
+ * @example
+ * ```ts
+ * const viewer = new SubtreeShapeDiffViewer(comparer);
+ * const diffs = viewer.highlight(oldTree, newTree);
+ *
+ * const grown = diffs.filter(d => d.type === "GROWN");
+ * grown.forEach(d => {
+ *   console.log(`${d.targetNode?.tagName} gained ${d.delta} children`);
+ * });
+ * ```
  */
 export class SubtreeShapeDiffViewer implements DiffViewer<SubtreeShapeDiffType> {
   private comparer: Comparer;
 
+  /**
+   * @param comparer - The {@link Comparer} used to match nodes between trees.
+   */
   constructor(comparer: Comparer) {
     this.comparer = comparer;
   }
 
+  /**
+   * Compares two trees and returns subtree-shape differences.
+   *
+   * @param reference - The old (baseline) tree.
+   * @param target - The new (current) tree.
+   * @returns Array of diff points classified as ADDED, DELETED, GROWN, SHRUNK,
+   *          or DEPTH_CHANGED.
+   */
   highlight(
     reference: ContextTree,
     target: ContextTree,

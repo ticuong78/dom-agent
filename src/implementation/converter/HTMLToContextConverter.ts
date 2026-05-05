@@ -13,15 +13,48 @@ type ParentSurface = {
   depth: number;
 };
 
+/**
+ * Converts a raw {@link HTMLNode} tree into an indexed {@link ContextTree}.
+ *
+ * This is the bridge between the parsing layer (adapters) and the analysis
+ * layer (comparers, viewers, sentinels). It walks the HTMLNode tree recursively,
+ * enriching each node with computed metadata (depth, height, attribute analysis,
+ * text hashing, parent surface) and assembling the result into a ContextTree.
+ *
+ * @example
+ * ```ts
+ * const adapter = new CheerioAdapter();
+ * const converter = new HTMLToContextConverter(new UUIDAdapter(), new SHA256HashAdapter());
+ *
+ * const htmlNode = adapter.parse("<div><p>Hello</p></div>");
+ * const tree = converter.convert(htmlNode!);
+ * // tree.size() === 2 (div + p)
+ * ```
+ */
 export class HTMLToContextConverter {
   private hasher: HashAdapter;
   private idGenerator: IDAdapter;
 
+  /**
+   * @param idGenerator - An {@link IDAdapter} for generating unique node IDs.
+   * @param hasher - A {@link HashAdapter} for hashing text content and computing treeId.
+   */
   constructor(idGenerator: IDAdapter, hasher: HashAdapter) {
     this.idGenerator = idGenerator;
     this.hasher = hasher;
   }
 
+  /**
+   * Converts an {@link HTMLNode} tree into a {@link ContextTree}.
+   *
+   * Only nodes of type `"tag"` are included. Text, comment, script, and
+   * style nodes are skipped (their text content is captured via `directText`
+   * on their parent).
+   *
+   * @param currentNode - The root HTMLNode to start conversion from.
+   * @param depth - Starting depth (defaults to 0 for the root).
+   * @returns A fully indexed {@link ContextTree}, or `null` if the root is not a tag node.
+   */
   convert(currentNode: HTMLNode, depth: number = 0) {
     const root = this._convert(currentNode, depth, null);
     return root ? new ContextTree(root, this.hasher) : null;
@@ -36,7 +69,6 @@ export class HTMLToContextConverter {
 
     const id = this.idGenerator.generate();
 
-    // Compute this node's surface before recursing so children can reference it
     const currentAttributeCount = Object.keys(
       analyzeAttributes(currentNode.attributes),
     ).length;

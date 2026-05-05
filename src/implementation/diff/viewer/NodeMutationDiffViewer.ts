@@ -3,6 +3,14 @@ import type { ValueType } from "@core/context/ContextNode";
 import { DiffPoint, type DiffType, type DiffViewer } from "@core/diff";
 import type { Comparer } from "@core/compare/Comparer";
 
+/**
+ * Extended diff types emitted by {@link NodeMutationDiffViewer}.
+ *
+ * - `"ADDED"` / `"DELETED"` — base types
+ * - `"TAG_CHANGED"` — the element's tag name was swapped (e.g. `<div>` → `<section>`)
+ * - `"ATTRIBUTE_CHANGED"` — attributes were added, removed, or modified
+ * - `"TEXT_CHANGED"` — the node's direct text content was modified
+ */
 export type NodeMutationDiffType =
   | DiffType
   | "TAG_CHANGED"
@@ -10,26 +18,48 @@ export type NodeMutationDiffType =
   | "TEXT_CHANGED";
 
 /**
- * NodeMutationDiffViewer — node-lens viewer.
+ * A node-lens {@link DiffViewer} that detects in-place property mutations.
  *
- * Detects in-place mutations: a matched node whose surface properties
- * (tagName, attributes, directText) changed between snapshots.
- *
- * Precondition: works best when the DOM hierarchy is relatively stable
- * so the Comparer can produce meaningful matches. If the entire tree
- * is reorganised, positional matching will pair wrong nodes and the
- * mutations reported will be noise.
- *
- * A single matched pair can emit multiple diff types (e.g. both
+ * For each matched node pair, checks whether the tag name, attributes, or
+ * text content changed. A single pair can emit multiple diff types (e.g. both
  * TAG_CHANGED and TEXT_CHANGED if both changed simultaneously).
+ *
+ * **Best used when:** the DOM hierarchy is relatively stable and you want
+ * to detect content or styling changes on existing elements.
+ *
+ * **Precondition:** works best when the {@link Comparer} can produce meaningful
+ * matches. If the entire tree is reorganised, positional matching will pair
+ * wrong nodes and the mutations reported will be noise.
+ *
+ * @example
+ * ```ts
+ * const viewer = new NodeMutationDiffViewer(comparer);
+ * const diffs = viewer.highlight(oldTree, newTree);
+ *
+ * const textChanges = diffs.filter(d => d.type === "TEXT_CHANGED");
+ * textChanges.forEach(d => {
+ *   console.log(`"${d.referenceNode?.directText}" → "${d.targetNode?.directText}"`);
+ * });
+ * ```
  */
 export class NodeMutationDiffViewer implements DiffViewer<NodeMutationDiffType> {
   private comparer: Comparer;
 
+  /**
+   * @param comparer - The {@link Comparer} used to match nodes between trees.
+   */
   constructor(comparer: Comparer) {
     this.comparer = comparer;
   }
 
+  /**
+   * Compares two trees and returns mutation-related differences.
+   *
+   * @param reference - The old (baseline) tree.
+   * @param target - The new (current) tree.
+   * @returns Array of diff points classified as ADDED, DELETED, TAG_CHANGED,
+   *          ATTRIBUTE_CHANGED, or TEXT_CHANGED.
+   */
   highlight(
     reference: ContextTree,
     target: ContextTree,
@@ -88,8 +118,7 @@ export class NodeMutationDiffViewer implements DiffViewer<NodeMutationDiffType> 
 
   /**
    * Compares attribute analytics between two nodes.
-   * Checks both the set of attribute keys and their analysed values
-   * (numberOfValues, totalLength) — not just the count.
+   * Checks both the set of attribute keys and their analysed values.
    */
   private attributesChanged(r: ContextNode, t: ContextNode): boolean {
     if (r.attributeCount !== t.attributeCount) return true;
@@ -97,13 +126,11 @@ export class NodeMutationDiffViewer implements DiffViewer<NodeMutationDiffType> 
     const rKeys = Object.keys(r.attributeAnalytic);
     const tKeys = Object.keys(t.attributeAnalytic);
 
-    // Different attribute names
     if (rKeys.length !== tKeys.length) return true;
     for (const key of rKeys) {
       if (!(key in t.attributeAnalytic)) return true;
     }
 
-    // Same keys — check if values changed
     for (const key of rKeys) {
       const rVal = r.attributeAnalytic[key] as ValueType;
       const tVal = t.attributeAnalytic[key] as ValueType;
