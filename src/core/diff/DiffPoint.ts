@@ -3,27 +3,85 @@ import type { ContextNodeSnapshot } from "@core/context";
 import type { ISerializable } from "@core/interface";
 
 /**
- * Base diff types that every viewer can emit.
+ * Base diff classification types emitted by all viewers.
+ *
+ * - `"ADDED"` — node exists in target but not in reference (new node)
+ * - `"DELETED"` — node exists in reference but not in target (removed node)
  */
 export type DiffType = "ADDED" | "DELETED";
 
+/**
+ * JSON-serializable snapshot of a {@link DiffPoint}.
+ * All circular node references are replaced with their serialized form.
+ */
 export type DiffPointSnapshot = {
+  /** The diff classification (e.g. "ADDED", "DELETED", "REPARENTED"). */
   type: string;
+
+  /** Serialized reference node (from old DOM), or `null` if this is an addition. */
   referenceNode: ContextNodeSnapshot | null;
+
+  /** Serialized target node (from new DOM), or `null` if this is a deletion. */
   targetNode: ContextNodeSnapshot | null;
+
+  /** Serialized parent of the reference node, if relevant to this diff type. */
   referenceParentNode?: ContextNodeSnapshot | null;
+
+  /** Serialized parent of the target node, if relevant to this diff type. */
   targetParentNode?: ContextNodeSnapshot | null;
+
+  /** Optional quantitative delta (e.g. number of children added/removed). */
   delta?: number;
 };
 
 /**
- * Generic diff point emitted by a viewer.
+ * A single detected difference between two DOM snapshots.
  *
- * `delta` remains optional metadata for viewers that want to attach
- * quantitative detail.
+ * `DiffPoint` is the atomic unit of dom-agent's diff output. Each instance
+ * describes one change, classified by `type`, with references to the affected
+ * nodes in both the old (reference) and new (target) trees.
+ *
+ * The generic parameter `T` allows viewers to emit domain-specific diff types
+ * beyond the base `ADDED`/`DELETED` (e.g. `"REPARENTED"`, `"TEXT_CHANGED"`).
+ *
+ * @typeParam T - The diff type enum this point uses. Defaults to {@link DiffType}.
+ *
+ * @example
+ * ```ts
+ * // A node was deleted
+ * const point = new DiffPoint("DELETED", oldNode, null);
+ *
+ * // A node was reparented (custom type from TreeHierarchyDiffViewer)
+ * const point = new DiffPoint("REPARENTED", oldNode, newNode, oldParent, newParent);
+ *
+ * // A subtree grew by 3 children
+ * const point = new DiffPoint("GROWN", oldNode, newNode, null, null, 3);
+ * ```
  */
 export class DiffPoint<T extends string = DiffType> implements ISerializable {
-  // atomic
+  /**
+   * @param type - The classification of this diff (e.g. "DELETED", "ATTRIBUTE_CHANGED").
+   * @param referenceNode - The node from the reference (old) tree, or `null` for additions.
+   * @param targetNode - The node from the target (new) tree, or `null` for deletions.
+   * @param referenceParentNode - Parent of the reference node (used by hierarchy viewers).
+   * @param targetParentNode - Parent of the target node (used by hierarchy viewers).
+   * @param delta - Optional numeric delta providing quantitative detail.
+   */
+  constructor(
+    readonly type: T,
+    readonly referenceNode: ContextNode | null,
+    readonly targetNode: ContextNode | null,
+    readonly referenceParentNode?: ContextNode | null,
+    readonly targetParentNode?: ContextNode | null,
+    readonly delta?: number,
+  ) {}
+
+  /**
+   * Serializes this diff point into a JSON-safe object.
+   * Node references become {@link ContextNodeSnapshot} objects.
+   *
+   * @returns A {@link DiffPointSnapshot} suitable for `JSON.stringify()`.
+   */
   serialize() {
     const serialized: DiffPointSnapshot = {
       type: this.type,
@@ -49,13 +107,4 @@ export class DiffPoint<T extends string = DiffType> implements ISerializable {
 
     return serialized;
   }
-
-  constructor(
-    readonly type: T,
-    readonly referenceNode: ContextNode | null,
-    readonly targetNode: ContextNode | null,
-    readonly referenceParentNode?: ContextNode | null,
-    readonly targetParentNode?: ContextNode | null,
-    readonly delta?: number,
-  ) {}
 }

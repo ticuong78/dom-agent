@@ -1,18 +1,54 @@
 import type { ISerializable } from "@core/interface";
 import type { DiffPoint, DiffPointSnapshot } from "./DiffPoint";
 
+/**
+ * JSON-serializable snapshot of a {@link DiffReport}.
+ */
 export type DiffReportSnapshot = {
+  /** ISO 8601 date string of when the report was generated. */
   reportDate: string;
+
+  /** Optional human-readable name for this report. */
   reportName: string | undefined;
+
+  /** Total number of diff points in this report. */
   totalDiffs: number;
+
+  /** All serialized diff points. */
   diffPoints: DiffPointSnapshot[];
 };
 
+/**
+ * A collection of {@link DiffPoint} instances representing all detected
+ * changes between two DOM snapshots.
+ *
+ * `DiffReport` is the output of a diff pipeline — it groups diff points
+ * together with metadata (date, name, count) and provides serialization
+ * for persistence or rendering.
+ *
+ * @example
+ * ```ts
+ * const points = viewer.highlight(oldTree, newTree);
+ * const report = new DiffReport(points, "homepage-daily-check");
+ *
+ * // Serialize for storage
+ * const json = JSON.stringify(report.serialize());
+ *
+ * // Pass to a reporter for HTML/JSON output
+ * reporter.report(report, "output/report.html");
+ * ```
+ */
 export class DiffReport implements ISerializable {
-  // group of points
+  /** Timestamp of when this report was created. */
   readonly reportDate: Date = new Date();
+
+  /** Total number of diff points. */
   readonly totalDiffs: number;
 
+  /**
+   * @param diffPoints - Array of diff points from one or more viewers.
+   * @param reportName - Optional name for this report. Defaults to the creation timestamp.
+   */
   constructor(
     readonly diffPoints: DiffPoint<string>[],
     readonly reportName?: string,
@@ -22,6 +58,11 @@ export class DiffReport implements ISerializable {
     this.totalDiffs = diffPoints.length;
   }
 
+  /**
+   * Serializes the report into a JSON-safe object.
+   *
+   * @returns A {@link DiffReportSnapshot} with all primitive fields.
+   */
   serialize(): DiffReportSnapshot {
     const snapshot: DiffReportSnapshot = {
       reportDate: this.reportDate.toLocaleDateString(),
