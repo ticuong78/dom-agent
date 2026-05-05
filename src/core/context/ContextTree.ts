@@ -1,4 +1,6 @@
-import type { ContextNode } from "../atoms";
+import type { ContextNode, ContextNodeSnapshot } from "./ContextNode";
+import type { HashAdapter } from "../crypto";
+import type { ISerializable } from "../interface";
 
 /**
  * A function that produces an identity signature from a ContextNode.
@@ -35,20 +37,44 @@ export const withClassSignatureCreator: SignatureCreator = (node) => {
   return [node.tagName, attrPart, node.directTextHash].join("|");
 };
 
-export class ContextTree {
+export type ContextTreeSnapshot = {
+  treeId: string;
+  createdDate: string;
+  lastUpdateDate: string;
+  nodeCount: number;
+  nodes: ContextNodeSnapshot[];
+};
+
+export class ContextTree implements ISerializable {
+  private readonly treeId: string;
+  private readonly createdDate: Date;
+  private lastUpdateDate: Date;
   private root: ContextNode;
   private byCompositeKey: Map<string, ContextNode> = new Map();
   private bySignature: Map<string, ContextNode[]> = new Map();
   private allNodes: ContextNode[] = [];
   private readonly signatureCreator: SignatureCreator;
+  private readonly hasher: HashAdapter;
 
   constructor(
     root: ContextNode,
+    hasher: HashAdapter,
     signatureCreator: SignatureCreator = defaultSignatureCreator,
   ) {
+    this.hasher = hasher;
     this.signatureCreator = signatureCreator;
     this.root = root;
+    this.createdDate = new Date();
+    this.lastUpdateDate = this.createdDate;
     this.index(root);
+    this.treeId = this.computeTreeId();
+  }
+
+  private computeTreeId(): string {
+    const content = this.allNodes
+      .map((node) => ContextTree.compositeKey(node))
+      .join(";");
+    return this.hasher.hash(content);
   }
 
   private index(node: ContextNode): void {
@@ -61,6 +87,18 @@ export class ContextTree {
 
     this.allNodes.push(node);
     node.children.forEach((child) => this.index(child));
+  }
+
+  // --- Serialization ---
+
+  serialize(): ContextTreeSnapshot {
+    return {
+      treeId: this.treeId,
+      createdDate: this.createdDate.toISOString(),
+      lastUpdateDate: this.lastUpdateDate.toISOString(),
+      nodeCount: this.allNodes.length,
+      nodes: this.allNodes.map((node) => node.serialize()),
+    };
   }
 
   // --- Composite Key (positional) ---
@@ -117,6 +155,18 @@ export class ContextTree {
   }
 
   // --- General ---
+
+  getTreeId(): string {
+    return this.treeId;
+  }
+
+  getCreatedDate(): Date {
+    return this.createdDate;
+  }
+
+  getLastUpdateDate(): Date {
+    return this.lastUpdateDate;
+  }
 
   getRoot(): ContextNode {
     return this.root;

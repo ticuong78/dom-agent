@@ -24,7 +24,7 @@ export class HTMLToContextConverter {
 
   convert(currentNode: HTMLNode, depth: number = 0) {
     const root = this._convert(currentNode, depth, null);
-    return root ? new ContextTree(root) : null;
+    return root ? new ContextTree(root, this.hasher) : null;
   }
 
   private _convert(
