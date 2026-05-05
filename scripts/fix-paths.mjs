@@ -10,8 +10,10 @@
  */
 import { readdir, readFile, writeFile, stat } from "node:fs/promises";
 import { join, dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const DIST = join(new URL(".", import.meta.url).pathname, "..", "dist");
+const __dirname = fileURLToPath(new URL(".", import.meta.url));
+const DIST = join(__dirname, "..", "dist");
 
 async function* walk(dir) {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
