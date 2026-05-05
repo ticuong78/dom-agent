@@ -32,14 +32,14 @@ export class DiffPoint<T extends string = DiffType> implements ISerializable {
     };
 
     if (this.referenceParentNode !== undefined) {
-      serialized.referenceParentNode = this.referenceNode
-        ? this.referenceNode.serialize()
+      serialized.referenceParentNode = this.referenceParentNode
+        ? this.referenceParentNode.serialize()
         : null;
     }
 
     if (this.targetParentNode !== undefined) {
-      serialized.targetParentNode = this.targetNode
-        ? this.targetNode.serialize()
+      serialized.targetParentNode = this.targetParentNode
+        ? this.targetParentNode.serialize()
         : null;
     }
 
