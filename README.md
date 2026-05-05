@@ -1,43 +1,93 @@
-# dom-agent
+<div align="center">
 
-**Monitors DOM structure changes on target websites to protect web scraping pipelines from breaking silently.**
+# dom-sentinel
 
-No AI. No ML. Pure algorithmic change detection using decomposed node signatures and rule-based comparison.
+**Pure-algorithmic DOM change detection. No AI. No ML. No black boxes.**
+
+[![npm version](https://img.shields.io/npm/v/@ticuong78/dom-agent?color=cb3837&label=npm)](https://www.npmjs.com/package/@ticuong78/dom-agent)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A518-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](./LICENSE)
+[![Module: ESM](https://img.shields.io/badge/Module-ESM-f7df1e)](https://nodejs.org/api/esm.html)
+[![Vitest](https://img.shields.io/badge/Tested_with-Vitest-6e9f18?logo=vitest&logoColor=white)](https://vitest.dev/)
+[![Zero AI Dependencies](https://img.shields.io/badge/AI_Dependencies-Zero-brightgreen)](#design-philosophy)
+
+</div>
 
 ---
 
 ## The Problem
 
-Web scrapers are fragile. A site redesign, a renamed CSS class, a rearranged layout — any of these can silently break your pipeline. You only find out when your data goes stale or your downstream systems start failing. By then, the damage is done.
+Web scrapers are fragile. A site redesign, a renamed CSS class, a rearranged layout — any of these can silently break your pipeline. You only find out when your data goes stale or your downstream systems start failing.
 
-Most solutions throw machine learning at this: training models to recognize "similar" elements, embedding-based matching, visual diffing. These approaches are expensive, opaque, and slow. They require training data, GPU resources, and produce results you can't explain to a stakeholder.
+Most solutions throw machine learning at this: embeddings, visual diffing, trained models. Expensive, opaque, slow, and impossible to explain to a stakeholder.
 
 ## The Solution
 
-dom-agent takes a different approach. It decomposes every DOM node into a set of scalar properties — tag name, attribute structure, depth, child count, subtree height, parent surface — and compares them field-by-field using configurable rules. No hashing. No embeddings. No black boxes.
+dom-sentinel decomposes every DOM node into scalar properties — tag name, attribute structure, depth, child count, subtree height, parent surface — and compares them field-by-field using configurable rules. Fast, explainable, deterministic.
 
-The result: fast, explainable, deterministic change detection that tells you exactly _what_ changed, _how_ it changed, and _where_ it changed — in terms you can act on programmatically.
+When a match fails, you know _which_ property diverged, _how_ it changed, and _where_ it happened.
+
+---
+
+## Install
+
+```bash
+npm install @ticuong78/dom-agent
+```
+
+## Quick Start
+
+```typescript
+import {
+  CheerioAdapter,
+  SHA256HashAdapter,
+  UUIDAdapter,
+  HTMLToContextConverter,
+  CompareRule,
+  RuleBasedComparer,
+  TreeHierarchyDiffViewer,
+} from "@ticuong78/dom-agent";
+
+// 1. Parse HTML into ContextTrees
+const adapter = new CheerioAdapter();
+const converter = new HTMLToContextConverter(
+  new UUIDAdapter(),
+  new SHA256HashAdapter(),
+);
+const tree1 = converter.convert(adapter.parse(htmlBefore));
+const tree2 = converter.convert(adapter.parse(htmlAfter));
+
+// 2. Define matching rules
+const rule = new CompareRule([
+  { attType: "tagName", matchType: "match", logicType: "and" },
+  { attType: "attributeAnalytic", matchType: "values_match", logicType: "and" },
+]);
+
+// 3. Detect changes
+const viewer = new TreeHierarchyDiffViewer(new RuleBasedComparer(rule));
+const diffs = viewer.highlight(tree1, tree2);
+
+for (const diff of diffs) {
+  console.log(
+    diff.type,
+    diff.referenceNode?.tagName,
+    "->",
+    diff.targetNode?.tagName,
+  );
+}
+```
 
 ---
 
 ## Architecture
 
-dom-agent follows a hexagonal (ports-and-adapters) architecture with three clean layers:
+dom-sentinel follows a hexagonal (ports-and-adapters) architecture:
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                     core/                           │
-│  Interfaces, types, contracts (the "what")          │
-│  ContextNode · CompareRule · DiffViewer · Comparer  │
-├─────────────────────────────────────────────────────┤
-│                 implementation/                     │
-│  Concrete strategies (the "how")                    │
-│  RuleBasedComparer · TreeHierarchyDiffViewer · ...  │
-├─────────────────────────────────────────────────────┤
-│                   adapters/                         │
-│  Third-party integrations (the "with what")         │
-│  CheerioAdapter · SHA256HashAdapter · UUIDAdapter   │
-└─────────────────────────────────────────────────────┘
+ core/               Interfaces, types, contracts
+ implementation/     Concrete strategies
+ adapters/           Third-party wrappers (Cheerio, SHA-256, UUID)
 ```
 
 Each layer depends only on the one above it. Swap Cheerio for JSDOM, SHA-256 for xxHash, UUID for nanoid — the core never knows.
@@ -46,21 +96,21 @@ Each layer depends only on the one above it. Swap Cheerio for JSDOM, SHA-256 for
 
 ### ContextNode
 
-The atomic unit. Every HTML element is converted into a `ContextNode` carrying decomposed scalar properties:
+Every HTML element becomes a `ContextNode` with decomposed scalar properties:
 
-| Category           | Properties                                             | Purpose                                       |
-| ------------------ | ------------------------------------------------------ | --------------------------------------------- |
-| **Surface**        | `tagName`, `attributeAnalytic`, `attributeCount`       | What the node _is_ — its identity             |
-| **Inner**          | `height`, `childCount`                                 | What's _inside_ the node — its subtree shape  |
-| **Positioning**    | `depth`, `nthChild`, `siblingCount`                    | Where the node _sits_ — its location          |
-| **Text**           | `directText`, `directTextHash`                         | The node's own text content (not children's)  |
-| **Parent Surface** | `parentTagName`, `parentAttributeCount`, `parentDepth` | The parent's identity, propagated to children |
+| Category        | Properties                                             | Purpose                     |
+| --------------- | ------------------------------------------------------ | --------------------------- |
+| **Surface**     | `tagName`, `attributeAnalytic`, `attributeCount`       | What the node _is_          |
+| **Inner**       | `height`, `childCount`                                 | What is _inside_ the node   |
+| **Positioning** | `depth`, `nthChild`, `siblingCount`                    | Where the node _sits_       |
+| **Text**        | `directText`, `directTextHash`                         | The node's own text content |
+| **Parent**      | `parentTagName`, `parentAttributeCount`, `parentDepth` | Parent identity, propagated |
 
-These properties replace the traditional monolithic hash signature. Instead of comparing two opaque strings, dom-agent compares individual fields — so when a match fails, you know _which_ property diverged.
+Instead of comparing two opaque hashes, dom-sentinel compares individual fields — when a match fails, you know exactly which property diverged.
 
 ### CompareRule
 
-A declarative set of comparison points that define when two nodes should be considered "the same node." Each point specifies a property, a match type, and a logic operator:
+Declarative matching criteria that define when two nodes are "the same":
 
 ```typescript
 const rule = new CompareRule([
@@ -70,239 +120,134 @@ const rule = new CompareRule([
 ]);
 ```
 
-**Scalar compare points:**
+Compare point types:
 
-- `NumericComparePoint` — `equal`, `less`, `greater` on any numeric property
-- `StringComparePoint` — `match`, `unmatch` on any string property
+- **Scalar** — `equal` / `less` / `greater` on numeric properties, `match` / `unmatch` on strings
+- **Attribute** — `keys_match` (same key set), `values_match` (shared keys have identical values), `full_match` (both)
 
-**Attribute compare point:**
+The `values_match` mode is the recommended baseline: a node gaining `data-verified="true"` still pairs with its original (shared keys match), but the mutation viewer detects the attribute change downstream.
 
-- `keys_match` — both nodes have the exact same set of attribute keys
-- `values_match` — for every shared key, the actual values are identical
-- `full_match` — both keys and values match (strict equality)
+### DiffViewers
 
-The `values_match` mode is particularly powerful: it only checks _shared_ keys, so a node that gains a new attribute (like `data-verified="true"`) still pairs with its original version — but the attribute change is detected downstream by the mutation viewer.
+Three viewers, three lenses, composable results:
 
-### Comparer
+**TreeHierarchyDiffViewer** — structural rearrangements
 
-Matches nodes between two `ContextTree` snapshots. The `RuleBasedComparer` implementation uses:
+| Diff Type    | Meaning                          |
+| ------------ | -------------------------------- |
+| `REPARENTED` | Node moved to a different parent |
+| `REORDERED`  | Same parent, different position  |
+| `ADDED`      | Only in target                   |
+| `DELETED`    | Only in reference                |
 
-1. **GroupKeyFn** — a coarse bucketing function (default: by `tagName`) that reduces O(n*m) comparisons to O(n*m/k)
-2. **CompareRule** — evaluates candidate pairs within each bucket
-3. **Proximity tiebreaker** — among passing candidates, picks the closest match by `depth * 100 + nthChild`
+**NodeMutationDiffViewer** — in-place mutations
 
-Output: `ComparePair[]` (matched nodes), `referenceOnly[]` (deleted), `targetOnly[]` (added).
+| Diff Type           | Meaning                                |
+| ------------------- | -------------------------------------- |
+| `TAG_CHANGED`       | Tag changed (e.g., `div` -> `section`) |
+| `ATTRIBUTE_CHANGED` | Attributes added, removed, or modified |
+| `TEXT_CHANGED`      | Direct text content changed            |
+| `ADDED` / `DELETED` | Unmatched nodes                        |
 
-### DiffViewer
+**SubtreeShapeDiffViewer** — subtree structure
 
-Classifies the changes found by a Comparer. Each viewer examines matched pairs through a specific lens:
+| Diff Type           | Meaning                                          |
+| ------------------- | ------------------------------------------------ |
+| `GROWN`             | Gained direct children (delta = count change)    |
+| `SHRUNK`            | Lost direct children                             |
+| `DEPTH_CHANGED`     | Subtree depth changed without child count change |
+| `ADDED` / `DELETED` | Unmatched nodes                                  |
 
-#### TreeHierarchyDiffViewer (context lens)
+Running multiple viewers and compositing results gives richer signals than any single viewer. A node flagged as both `REPARENTED` and `ATTRIBUTE_CHANGED` tells you it moved _and_ was modified in transit.
 
-Detects structural rearrangements by comparing parent surface and positioning:
+### Choosing the Right Comparer
 
-| Diff Type    | Meaning                                             |
-| ------------ | --------------------------------------------------- |
-| `REPARENTED` | Node moved to a different parent                    |
-| `REORDERED`  | Node stayed in the same parent but changed position |
-| `ADDED`      | Node exists only in the target tree                 |
-| `DELETED`    | Node exists only in the reference tree              |
+| Viewer                  | Recommended Rule                         | Why                                       |
+| ----------------------- | ---------------------------------------- | ----------------------------------------- |
+| TreeHierarchyDiffViewer | `tagName + values_match` (no depth)      | Reparented nodes change depth             |
+| NodeMutationDiffViewer  | `depth + values_match`, grouped by depth | Tag-changed nodes have different tagNames |
+| SubtreeShapeDiffViewer  | `tagName + values_match`                 | Standard structural matching              |
 
-#### NodeMutationDiffViewer (node lens)
+### Reporting
 
-Detects in-place mutations on matched pairs. A single pair can emit multiple types:
+- **HTMLDiffReporter** — visual HTML report with color-coded badges, expandable cards, and side-by-side panels
+- **JSONDiffReporter** — structured JSON with flattened node snapshots (circular references resolved to IDs)
 
-| Diff Type           | Meaning                                     |
-| ------------------- | ------------------------------------------- |
-| `TAG_CHANGED`       | HTML tag changed (e.g., `div` → `section`)  |
-| `ATTRIBUTE_CHANGED` | Attributes were added, removed, or modified |
-| `TEXT_CHANGED`      | Direct text content changed                 |
-| `ADDED` / `DELETED` | Unmatched nodes                             |
-
-#### SubtreeShapeDiffViewer (inner lens)
-
-Detects subtree structure changes using inner properties:
-
-| Diff Type           | Meaning                                                                        |
-| ------------------- | ------------------------------------------------------------------------------ |
-| `GROWN`             | Node gained direct children (`delta` = count increase)                         |
-| `SHRUNK`            | Node lost direct children (`delta` = count decrease)                           |
-| `DEPTH_CHANGED`     | Subtree depth changed without child count change (`delta` = height difference) |
-| `ADDED` / `DELETED` | Unmatched nodes                                                                |
-
-### Why Multiple Viewers?
-
-No single viewer covers every scenario — and that's by design. Each viewer declares its lens, has its own preconditions, and emits its own diff types. When you composite them, conflicts between viewers become higher-fidelity signals than either verdict alone.
-
-A node that `TreeHierarchyDiffViewer` calls REPARENTED but `NodeMutationDiffViewer` also flags as ATTRIBUTE*CHANGED tells you more than either verdict in isolation: the node moved \_and* was modified in transit.
-
-### DiffReporter
-
-Renders diff results into human-readable or machine-readable formats:
-
-- **HTMLDiffReporter** — visual side-by-side report with color-coded badges per diff type
-- **JSONDiffReporter** — structured JSON output with flattened node snapshots (circular references resolved to IDs)
-
-## Themes
-
-Themes are responsible for rendering diff reports into complete HTML interfaces. A theme defines the layout, visual style, summaries, cards, detail panels, and interactions used to present diff results.
-
-At the moment, there are **2 available themes**:
-
-- **DeepSpaceTheme** — a dark, dashboard-like renderer for diff reports, with summary pills, expandable change cards, side-by-side reference/target panels, and dedicated handling for structural changes such as reparenting. :contentReference[oaicite:0]{index=0}
-- **Example theme** — a reference implementation that demonstrates the theming structure and provides a simpler baseline for building custom report views.
-
-This theming layer keeps presentation separate from the core diffing logic, making it easy to add more report styles over time.
+Two built-in themes for HTML reports: **DeepSpaceTheme** (dark, dashboard-like) and **DashboardLikeTheme** (clean, card-based). Implement the `Renderer` interface to create your own.
 
 ---
 
 ## Folder Structure
 
 ```
-dom-agent/
-├── src/
-│   ├── core/                         # Interfaces & types (no implementations)
-│   │   ├── compare/                  # CompareRule, CompareRuleManager, Comparer
-│   │   ├── context/                  # ContextNode, ContextTree
-│   │   ├── converter/                # Converter interface
-│   │   ├── crypto/                   # HashAdapter, IDAdapter interfaces
-│   │   ├── diff/                     # DiffPoint, DiffViewer, DiffReporter
-│   │   ├── plain/                    # HTMLNode, HTMLAdapter interfaces
-│   │   ├── interface/                # Characteristic-like interfaces
-│   │   └── renderer/                 # Renderr interface
-│   │
-│   ├── implementation/               # Concrete strategies
-│   │   ├── compare/                  # RuleBasedComparer
-│   │   ├── converter/                # HTMLToContextConverter
-│   │   └── diff/
-│   │       ├── viewer/               # TreeHierarchy, NodeMutation, SubtreeShape
-│   │       ├── reporter/             # HTMLDiffReporter, JSONDiffReporter
-│   │       └── theme/                # DashboardLikeTheme, DeepSpaceTheme
-│   │
-│   ├── adapters/                     # Third-party wrappers
-│   │   ├── atom/                     # CheerioAdapter (HTML parsing)
-│   │   ├── hash/                     # SHA256HashAdapter
-│   │   └── id/                       # UUIDAdapter
-│   │
-│   └── index.ts                      # Demo / entry point
-│
-├── tests/
-│   └── unit/                         # Unit tests (vitest)
-│
-└── report/                           # Generated diff reports (HTML + JSON)
+dom-sentinel/
+  src/
+    core/                   Interfaces & types only
+      compare/              CompareRule, CompareRuleManager, Comparer
+      context/              ContextNode, ContextTree
+      converter/            Converter interface
+      crypto/               HashAdapter, IDAdapter
+      diff/                 DiffPoint, DiffViewer, DiffReporter, DiffReport
+      interface/            ISerializable
+      plain/                HTMLNode, HTMLAdapter
+      renderer/             Renderer interface
+
+    implementation/         Concrete strategies
+      compare/              RuleBasedComparer
+      converter/            HTMLToContextConverter
+      diff/
+        viewer/             TreeHierarchy, NodeMutation, SubtreeShape
+        reporter/           HTMLDiffReporter, JSONDiffReporter
+      theme/                DeepSpaceTheme, DashboardLikeTheme
+
+    adapters/               Third-party wrappers
+      atom/                 CheerioAdapter
+      hash/                 SHA256HashAdapter
+      id/                   UUIDAdapter
+
+  examples/                 Demo scripts
+  tests/                    Unit & integration tests
+  scripts/                  Build tooling
 ```
-
----
-
-## Quick Start
-
-```bash
-npm install
-npm run dev
-start report/hierarchyDiffs.html
-```
-
-This runs the demo in `src/index.ts`, which:
-
-1. Parses two HTML snapshots (reference and target)
-2. Converts them to `ContextTree` structures
-3. Runs three DiffViewers with tailored Comparers
-4. Outputs diff results to console and generates reports in `report/`
-5. Displays HTML-like diff results on a browser
-
-### Programmatic Usage
-
-```typescript
-import { CheerioAdapter } from "@adapters/atom";
-import { SHA256HashAdapter } from "@adapters/hash";
-import { UUIDAdapter } from "@adapters/id";
-import { HTMLToContextConverter } from "@implementation/converter/HTMLToContextConverter";
-import { CompareRule } from "@core/compare/CompareRule";
-import { RuleBasedComparer } from "@implementation/compare/RuleBasedComparer";
-import { TreeHierarchyDiffViewer } from "@implementation/diff/viewer/TreeHierarchyDiffViewer";
-
-// 1. Parse HTML into ContextTrees
-const adapter = new CheerioAdapter();
-const converter = new HTMLToContextConverter(
-  new UUIDAdapter(),
-  new SHA256HashAdapter(),
-);
-
-const tree1 = converter.convert(adapter.parse(htmlSnapshot1));
-const tree2 = converter.convert(adapter.parse(htmlSnapshot2));
-
-// 2. Define matching rules
-const rule = new CompareRule([
-  { attType: "tagName", matchType: "match", logicType: "and" },
-  { attType: "attributeAnalytic", matchType: "values_match", logicType: "and" },
-]);
-const comparer = new RuleBasedComparer(rule);
-
-// 3. Detect changes
-const viewer = new TreeHierarchyDiffViewer(comparer);
-const diffs = viewer.highlight(tree1, tree2);
-
-for (const diff of diffs) {
-  console.log(
-    diff.type,
-    diff.referenceNode?.tagName,
-    "→",
-    diff.targetNode?.tagName,
-  );
-}
-```
-
----
 
 ## Design Philosophy
 
-### Decomposed Signatures over Monolithic Hashes
+**Decomposed signatures over monolithic hashes.** When two hashes don't match, you know _something_ changed but not _what_. dom-sentinel keeps every property as a separate comparable field. Comparison short-circuits early, output tells you exactly which field diverged.
 
-Traditional DOM diffing hashes node properties into a single string signature. When two hashes don't match, you know _something_ changed but not _what_. dom-agent keeps every property as a separate comparable field. The comparison is faster (scalar checks short-circuit before touching all fields) and the output is more informative (you see exactly which property diverged).
+**Rules over algorithms.** The CompareRule system makes matching criteria a configuration choice, not a code change. Monitoring a login form? Match by `tagName + id`. Product listing? `tagName + depth + class`.
 
-### Rules over Algorithms
+**Viewers as lenses, not verdicts.** Each DiffViewer examines changes through one lens. None claims completeness. Composite them for a richer picture.
 
-The `CompareRule` system lets you define matching criteria declaratively. Different use cases need different strictness levels. Monitoring a login form? Match by `tagName + id attribute`. Monitoring a product listing? Match by `tagName + depth + class`. The rule system makes this a configuration choice, not a code change.
-
-### Viewers as Lenses, Not Verdicts
-
-Each DiffViewer examines changes through a specific lens. None claims to be complete. `TreeHierarchyDiffViewer` knows about structure but not content. `NodeMutationDiffViewer` knows about content but not subtree shape. Running multiple viewers and compositing their results gives you a richer picture than any single viewer could.
-
-### Adapters as Boundaries
-
-Every third-party dependency (Cheerio, SHA-256, UUID) is isolated behind an interface. The core library has zero external dependencies. This means:
-
-- Swap parsing libraries without touching comparison logic
-- Swap hash functions without touching node construction
-- Test with mocks that satisfy the interface contracts
+**Adapters as boundaries.** Every third-party dependency is isolated behind an interface. The core has zero external dependencies. Swap parsing libraries, hash functions, or ID generators without touching comparison logic.
 
 ---
 
-## Choosing the Right Comparer
-
-Different viewers may need different Comparer configurations:
-
-| Viewer                  | Recommended Rule                         | Why                                                                                                  |
-| ----------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| TreeHierarchyDiffViewer | `tagName + values_match` (no depth)      | Reparented nodes change depth — requiring depth equality would miss them                             |
-| NodeMutationDiffViewer  | `depth + values_match`, grouped by depth | Tag-changed nodes have different tagNames — grouping by depth instead of tagName allows pairing them |
-| SubtreeShapeDiffViewer  | `tagName + values_match`                 | Standard structural matching is sufficient for subtree comparison                                    |
-
-The `values_match` attribute mode is recommended as a baseline because it prevents false pairings between structurally similar but semantically different nodes (e.g., a `div.uncle` and a `div.aunt` with the same tag, depth, and attribute count but different attribute values).
-
----
-
-## Running Tests
+## Scripts
 
 ```bash
-npm test              # Run all tests
-npm run test:unit     # Unit tests only
-npm run test:coverage # With coverage report
-npm run test:watch    # Watch mode
+npm run build          # Compile for publishing
+npm run dev            # Run demo
+npm test               # All tests
+npm run test:unit      # Unit tests only
+npm run test:coverage  # With coverage
+npm run test:watch     # Watch mode
 ```
 
----
+## Tech Stack
+
+| Tool       | Version | Purpose               |
+| ---------- | ------- | --------------------- |
+| TypeScript | 6.0     | Language              |
+| Node.js    | >= 18   | Runtime               |
+| Cheerio    | 1.2     | HTML parsing          |
+| Vitest     | 4.1     | Testing               |
+| tsc-alias  | 1.8     | Path alias resolution |
 
 ## License
 
-MIT
+This project is dual-licensed:
+
+- **GPL-3.0** for open-source use — see [LICENSE](./LICENSE)
+- **Commercial license** for proprietary use — see [COMMERCIAL-LICENSE.md](./COMMERCIAL-LICENSE.md)
+
+For commercial licensing inquiries, contact lephamhungcuong219@gmail.com.

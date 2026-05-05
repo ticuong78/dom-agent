@@ -6,9 +6,17 @@
     "url": "https://github.com/ticuong78"
   },
   "version": "1.0.0",
-  "main": "dist/src/index.js",
-  "types": "dist/src/index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "type": "module",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
   "description": "Monitors DOM structure changes on target websites to protect web scraping pipelines from breaking silently.",
   "keywords": [
     "dom",
@@ -27,6 +35,7 @@
   "devDependencies": {
     "@types/node": "^25.6.0",
     "@vitest/coverage-v8": "^4.1.5",
+    "tsc-alias": "^1.8.17",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.5"
@@ -36,14 +45,15 @@
     "README.md",
     "LICENSE"
   ],
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "dependencies": {
     "cheerio": "^1.2.0"
   },
   "funding": "https://github.com/sponsors/ticuong78",
   "scripts": {
-    "build": "tsc",
-    "dev": "tsx src/index.ts",
+    "clean": "rm -rf dist",
+    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json --resolve-full-paths && node scripts/fix-paths.mjs",
+    "dev": "tsx examples/demo.ts",
     "test": "vitest run --reporter=verbose",
     "test:unit": "vitest run --reporter=verbose tests/unit",
     "test:integration": "vitest run --reporter=verbose tests/integration",
