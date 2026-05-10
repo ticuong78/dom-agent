@@ -1,125 +1,128 @@
-// import { CheerioAdapter } from "@adapters/atom";
-// import { SHA256HashAdapter } from "@adapters/hash";
-// import { UUIDAdapter } from "@adapters/id";
-// import type { ContextTree } from "@core/context";
-// import { HTMLToContextConverter } from "@implementation/converter/HTMLToContextConverter";
+import { describe, expect, it } from "vitest";
+import {
+  ContextTree,
+  defaultSignatureCreator,
+  withClassSignatureCreator,
+} from "@core/context";
+import { createNode, fakeHasher, linkParent } from "../helpers";
 
-// const html = `
-// <!DOCTYPE html>
-// <html lang="en">
-// <body>
-//   <div class="generation_one" id="grandparents" data-generation="1">
-//     This is your grand parents family tree
-//     <div class="generation_two gen_a" id="parents-side" data-generation="2">
-//       This is your parents side
-//       <div class="generation_three gen_z" data-generation="3">
-//         <p>This is your generation</p>
-//       </div>
-//     </div>
-//   </div>
-// </body>
-// </html>
-// `;
+describe("ContextTree signatures", () => {
+  it("default signature excludes class while class-aware signature includes it", () => {
+    const node = createNode({
+      tagName: "a",
+      attributes: {
+        class: "button primary",
+        href: "/docs",
+        id: "learn",
+      },
+      directText: "Learn",
+    });
 
-// describe("ContextTree", () => {
-//   let tree: ContextTree;
+    expect(defaultSignatureCreator(node)).toBe("a|href=/docs&id=learn|hash:Learn");
+    expect(withClassSignatureCreator(node)).toBe(
+      "a|class=button primary&href=/docs&id=learn|hash:Learn",
+    );
+  });
+});
 
-//   beforeEach(() => {
-//     const adapter = new CheerioAdapter();
-//     const converter = new HTMLToContextConverter(
-//       new SHA256HashAdapter(),
-//       new UUIDAdapter(),
-//     );
+describe("ContextTree", () => {
+  it("indexes nodes in preorder by composite key and identity signature", () => {
+    const childA = createNode({
+      id: "child-a",
+      tagName: "li",
+      attributes: { "data-role": "item" },
+      directText: "same",
+      depth: 1,
+      nthChild: 0,
+      siblingCount: 2,
+    });
+    const childB = createNode({
+      id: "child-b",
+      tagName: "li",
+      attributes: { "data-role": "item" },
+      directText: "same",
+      depth: 1,
+      nthChild: 1,
+      siblingCount: 2,
+    });
+    const root = linkParent(
+      createNode({
+        id: "root",
+        tagName: "ul",
+        height: 1,
+        childCount: 2,
+        children: [childA, childB],
+      }),
+      [childA, childB],
+    );
 
-//     const htmlNode = adapter.parse(html);
-//     expect(htmlNode).not.toBeNull();
+    const tree = new ContextTree(root, fakeHasher);
+    const rootKey = ContextTree.compositeKey(root);
+    const childKey = ContextTree.compositeKey(childA);
+    const duplicatedSignature = tree.signature(childA);
 
-//     const result = converter.convert(htmlNode!);
-//     expect(result).not.toBeNull();
+    expect(tree.nodes().map((node) => node.id)).toEqual([
+      "root",
+      "child-a",
+      "child-b",
+    ]);
+    expect(ContextTree.compositeKey(childA)).toBe("1:0/2|li|1|hash:same");
+    expect(tree.getByCompositeKey(rootKey)).toBe(root);
+    expect(tree.getByCompositeKey(childKey)).toBe(childA);
+    expect(tree.compositeKeys()).toEqual(new Set([rootKey, childKey, ContextTree.compositeKey(childB)]));
+    expect(tree.hasSignature(duplicatedSignature)).toBe(true);
+    expect(tree.getBySignature(duplicatedSignature)).toEqual([childA, childB]);
+    expect(tree.getBySignature("missing-signature")).toEqual([]);
+    expect(tree.signatures().has(duplicatedSignature)).toBe(true);
+    expect(tree.getRoot()).toBe(root);
+    expect(tree.size()).toBe(3);
+  });
 
-//     tree = result!;
-//   });
+  it("computes deterministic tree ids from composite keys", () => {
+    const leaf = createNode({
+      id: "leaf",
+      tagName: "p",
+      directText: "Hello",
+      depth: 1,
+      nthChild: 0,
+      siblingCount: 1,
+    });
+    const root = linkParent(
+      createNode({
+        id: "root",
+        tagName: "main",
+        height: 1,
+        childCount: 1,
+        children: [leaf],
+      }),
+      [leaf],
+    );
 
-//   // --- structure tests ---
+    const tree = new ContextTree(root, fakeHasher);
 
-//   test("root node is generation_one", () => {
-//     expect(tree.getRoot().tagName).toBe("div");
-//     expect(tree.getRoot().attribute["class"]).toBe("generation_one");
-//   });
+    expect(tree.getTreeId()).toBe(
+      "hash:0:0/0|main|0|hash:;1:0/1|p|0|hash:Hello",
+    );
+  });
 
-//   test("root depth is 0", () => {
-//     expect(tree.getRoot().depth).toBe(0);
-//   });
+  it("serializes tree metadata and nodes in preorder", () => {
+    const child = createNode({ id: "child", depth: 1, nthChild: 0, siblingCount: 1 });
+    const root = linkParent(
+      createNode({ id: "root", height: 1, childCount: 1, children: [child] }),
+      [child],
+    );
+    const tree = new ContextTree(root, fakeHasher);
 
-//   test("child depth is 1", () => {
-//     const child = tree.getRoot().children[0];
-//     expect(child?.depth).toBe(1);
-//   });
+    const snapshot = tree.serialize();
 
-//   test("grandchild depth is 2", () => {
-//     const grandchild = tree.getRoot().children[0]?.children[0];
-//     expect(grandchild?.depth).toBe(2);
-//   });
-
-//   // --- linking tests ---
-
-//   test("child parent points back to root", () => {
-//     const child = tree.getRoot().children[0];
-//     expect(child?.parent?.tagName).toBe("div");
-//     expect(child?.parent?.attribute["id"]).toBe("grandparents");
-//   });
-
-//   test("siblings are linked correctly", () => {
-//     // add a sibling to test lateral linking
-//     const siblings = tree.getRoot().children;
-//     if (siblings.length > 1) {
-//       expect(siblings[0]?.nextSibling).toBe(siblings[1]);
-//       expect(siblings[1]?.previousSibling).toBe(siblings[0]);
-//     }
-//   });
-
-//   // --- signature tests ---
-
-//   test("nodeSignature is deterministic", () => {
-//     const root = tree.getRoot();
-//     const adapter = new CheerioAdapter();
-//     const converter = new HTMLToContextConverter(
-//       new SHA256HashAdapter(),
-//       new UUIDAdapter(),
-//     );
-//     const tree2 = converter.convert(adapter.parse(html)!)!;
-
-//     // same html = same signatures
-//     expect(root.nodeSignature).toBe(tree2.getRoot().nodeSignature);
-//     expect(root.innerSignature).toBe(tree2.getRoot().innerSignature);
-//     expect(root.contextSignature).toBe(tree2.getRoot().contextSignature);
-//   });
-
-//   test("contextSignature changes when depth changes", () => {
-//     const root = tree.getRoot();
-//     const child = tree.getRoot().children[0];
-//     // different depth = different contextSignature
-//     expect(root.contextSignature).not.toBe(child?.contextSignature);
-//   });
-
-//   // --- index tests ---
-
-//   test("getBySignature finds root", () => {
-//     const root = tree.getRoot();
-//     const found = tree.getBySignature(root.contextSignature);
-//     expect(found).toBe(root);
-//   });
-
-//   test("size equals total node count", () => {
-//     // html has: div.generation_one, div.generation_two, div.generation_three, p
-//     expect(tree.size()).toBe(4);
-//   });
-
-//   // --- walk tests ---
-
-//   test("walk visits every node", () => {
-//     const visited: string[] = [];
-//     tree.walk((node) => visited.push(node.tagName));
-//     expect(visited.length).toBe(tree.size());
-//   });
-// });
+    expect(snapshot.treeId).toBe(tree.getTreeId());
+    expect(snapshot.nodeCount).toBe(2);
+    expect(snapshot.nodes.map((node) => node.id)).toEqual(["root", "child"]);
+    expect(new Date(snapshot.createdDate).toISOString()).toBe(snapshot.createdDate);
+    expect(new Date(snapshot.lastUpdateDate).toISOString()).toBe(
+      snapshot.lastUpdateDate,
+    );
+    expect(tree.getCreatedDate()).toBeInstanceOf(Date);
+    expect(tree.getLastUpdateDate()).toBeInstanceOf(Date);
+  });
+});

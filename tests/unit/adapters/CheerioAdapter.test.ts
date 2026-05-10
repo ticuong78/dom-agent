@@ -1,209 +1,97 @@
-import { CheerioAdapter } from "@adapters/atom/CheerioAdapter";
+import { describe, expect, it } from "vitest";
+import { CheerioAdapter } from "@adapters/atom";
+import type { HTMLNode } from "@core/plain";
+import type { Element } from "domhandler";
 
 describe("CheerioAdapter", () => {
-  let adapter: CheerioAdapter;
+  const adapter = new CheerioAdapter();
 
-  beforeEach(() => {
-    adapter = new CheerioAdapter();
+  it("returns null when body has no element children", () => {
+    expect(adapter.parse("")).toBeNull();
+    expect(adapter.parse("plain text only")).toBeNull();
   });
 
-  // --- parse() ---
+  it("uses the first direct body child as the root", () => {
+    const root = adapter.parse("<main id='first'></main><section id='second'></section>");
 
-  describe("parse()", () => {
-    test("returns null when body has no children", () => {
-      const result = adapter.parse("<html><body></body></html>");
-      expect(result).toBeNull();
-    });
-
-    test("returns null when html is empty", () => {
-      const result = adapter.parse("");
-      expect(result).toBeNull();
-    });
-
-    test("returns root node as first direct child of body", () => {
-      const result = adapter.parse("<div class='root'>Hello</div>");
-      expect(result).not.toBeNull();
-      expect(result!.tagName).toBe("div");
-    });
-
-    test("ignores second sibling — only returns first child of body", () => {
-      const result = adapter.parse(`
-        <div class='first'>First</div>
-        <div class='second'>Second</div>
-      `);
-      expect(result!.attributes["class"]).toBe("first");
+    expect(root).toMatchObject({
+      type: "tag",
+      tagName: "main",
+      attributes: { id: "first" },
+      nthChild: 0,
+      siblingCount: 1,
     });
   });
 
-  // --- tagName ---
+  it("normalizes attributes, direct text, and tag children", () => {
+    const root = adapter.parse(`
+      <article data-id="42" class="card primary">
+        Hello
+        <script>ignored()</script>
+        <!-- ignored -->
+        <h1>Title</h1>
+        world
+        <style>.x { color: red; }</style>
+        <p>Body</p>
+      </article>
+    `);
 
-  describe("tagName", () => {
-    test("correctly extracts tagName", () => {
-      const result = adapter.parse("<section>content</section>");
-      expect(result!.tagName).toBe("section");
+    expect(root).not.toBeNull();
+    expect(root!.tagName).toBe("article");
+    expect(root!.attributes).toEqual({
+      "data-id": "42",
+      class: "card primary",
     });
-
-    test("correctly extracts nested tagName", () => {
-      const result = adapter.parse("<div><span>text</span></div>");
-      expect(result!.children[0]!.tagName).toBe("span");
-    });
+    expect(root!.directText).toBe("Hello world");
+    expect(root!.children.map((child) => child.tagName)).toEqual(["h1", "p"]);
   });
 
-  // --- attributes ---
+  it("computes zero-based nthChild and sibling counts among tag siblings", () => {
+    const root = adapter.parse(`
+      <ul>
+        text
+        <li>A</li>
+        <li>B</li>
+        <!-- comment -->
+        <li>C</li>
+      </ul>
+    `);
 
-  describe("attributes", () => {
-    test("correctly extracts single attribute", () => {
-      const result = adapter.parse("<div id='main'>text</div>");
-      expect(result!.attributes["id"]).toBe("main");
-    });
-
-    test("correctly extracts multiple attributes", () => {
-      const result = adapter.parse(`
-        <div class="foo" data-testid="bar" aria-label="baz">text</div>
-      `);
-      expect(result!.attributes["class"]).toBe("foo");
-      expect(result!.attributes["data-testid"]).toBe("bar");
-      expect(result!.attributes["aria-label"]).toBe("baz");
-    });
-
-    test("returns empty object when no attributes", () => {
-      const result = adapter.parse("<div>text</div>");
-      expect(result!.attributes).toEqual({});
-    });
+    expect(root!.children).toHaveLength(3);
+    expect(
+      root!.children.map((child) => ({
+        tagName: child.tagName,
+        nthChild: child.nthChild,
+        siblingCount: child.siblingCount,
+        directText: child.directText,
+      })),
+    ).toEqual([
+      { tagName: "li", nthChild: 0, siblingCount: 2, directText: "A" },
+      { tagName: "li", nthChild: 1, siblingCount: 2, directText: "B" },
+      { tagName: "li", nthChild: 2, siblingCount: 2, directText: "C" },
+    ]);
   });
 
-  // --- directText ---
+  it("normalizes a detached element with no parent as having no siblings", () => {
+    const normalize = (
+      adapter as unknown as {
+        normalize: ($: unknown, el: Element) => HTMLNode;
+      }
+    ).normalize.bind(adapter);
+    const node = normalize(null, {
+      type: "tag",
+      name: "section",
+      attribs: {},
+      children: [],
+      parent: null,
+    } as unknown as Element);
 
-  describe("directText", () => {
-    test("extracts direct text content", () => {
-      const result = adapter.parse("<div>Hello World</div>");
-      expect(result!.directText).toBe("Hello World");
-    });
-
-    test("does not include descendant text", () => {
-      const result = adapter.parse("<div>Direct <span>Nested</span></div>");
-      expect(result!.directText).toBe("Direct");
-    });
-
-    test("trims whitespace from text", () => {
-      const result = adapter.parse("<div>   Hello   </div>");
-      expect(result!.directText).toBe("Hello");
-    });
-
-    test("joins multiple direct text nodes", () => {
-      const result = adapter.parse("<div>Hello <span></span> World</div>");
-      expect(result!.directText).toBe("Hello World");
-    });
-
-    test("returns empty string when no direct text", () => {
-      const result = adapter.parse("<div><span>nested</span></div>");
-      expect(result!.directText).toBe("");
-    });
-  });
-
-  // --- children ---
-
-  describe("children", () => {
-    test("returns empty array for leaf node", () => {
-      const result = adapter.parse("<div>text</div>");
-      expect(result!.children).toHaveLength(0);
-    });
-
-    test("returns correct number of tag children", () => {
-      const result = adapter.parse(`
-        <div>
-          <span>one</span>
-          <span>two</span>
-          <span>three</span>
-        </div>
-      `);
-      expect(result!.children).toHaveLength(3);
-    });
-
-    test("skips text nodes in children", () => {
-      const result = adapter.parse(
-        "<div>text<span>child</span>more text</div>",
-      );
-      expect(result!.children).toHaveLength(1);
-      expect(result!.children[0]!.tagName).toBe("span");
-    });
-
-    test("skips comment nodes in children", () => {
-      const result = adapter.parse(
-        "<div><!-- comment --><span>child</span></div>",
-      );
-      expect(result!.children).toHaveLength(1);
-    });
-
-    test("recursively normalizes children", () => {
-      const result = adapter.parse(`
-        <div>
-          <section>
-            <p>deep</p>
-          </section>
-        </div>
-      `);
-      expect(result!.children[0]!.tagName).toBe("section");
-      expect(result!.children[0]!.children[0]!.tagName).toBe("p");
-    });
-  });
-
-  // --- siblingCount ---
-
-  describe("siblingCount", () => {
-    test("root node has siblingCount of 0 when alone", () => {
-      const result = adapter.parse("<div>only child</div>");
-      expect(result!.siblingCount).toBe(0);
-    });
-
-    test("children with siblings have correct siblingCount", () => {
-      const result = adapter.parse(`
-        <div>
-          <span>one</span>
-          <span>two</span>
-          <span>three</span>
-        </div>
-      `);
-      // each child has 2 siblings (3 total - self)
-      expect(result!.children[0]!.siblingCount).toBe(2);
-      expect(result!.children[1]!.siblingCount).toBe(2);
-      expect(result!.children[2]!.siblingCount).toBe(2);
-    });
-  });
-
-  // --- nthChild ---
-
-  describe("nthChild", () => {
-    test("only child has nthChild of 0", () => {
-      const result = adapter.parse("<div><span>only</span></div>");
-      expect(result!.children[0]!.nthChild).toBe(0);
-    });
-
-    test("children have correct nthChild positions", () => {
-      const result = adapter.parse(`
-        <div>
-          <span>first</span>
-          <span>second</span>
-          <span>third</span>
-        </div>
-      `);
-      expect(result!.children[0]!.nthChild).toBe(0);
-      expect(result!.children[1]!.nthChild).toBe(1);
-      expect(result!.children[2]!.nthChild).toBe(2);
-    });
-  });
-
-  // --- type ---
-
-  describe("type", () => {
-    test("all normalized nodes have type 'tag'", () => {
-      const result = adapter.parse(`
-        <div>
-          <span>text</span>
-        </div>
-      `);
-      expect(result!.type).toBe("tag");
-      expect(result!.children[0]!.type).toBe("tag");
+    expect(node).toMatchObject({
+      tagName: "section",
+      siblingCount: -1,
+      nthChild: -1,
+      directText: "",
+      children: [],
     });
   });
 });

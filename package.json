@@ -33,6 +33,7 @@
   "devDependencies": {
     "@types/node": "^25.6.0",
     "@vitest/coverage-v8": "^4.1.5",
+    "@vitest/ui": "^4.1.5",
     "tsc-alias": "^1.8.17",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
@@ -52,7 +53,7 @@
     "clean": "rm -rf dist",
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json --resolve-full-paths && node scripts/fix-paths.mjs",
     "dev": "tsx examples/demo.ts",
-    "test": "vitest run --reporter=verbose",
+    "test": "vitest",
     "test:unit": "vitest run --reporter=verbose tests/unit",
     "test:integration": "vitest run --reporter=verbose tests/integration",
     "test:coverage": "vitest run --coverage",
