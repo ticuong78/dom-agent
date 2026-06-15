@@ -1,14 +1,17 @@
 import type { ContextNode, ContextTree } from "@core/context";
-import { DiffPoint, type DiffType, type DiffViewer } from "@core/diff";
+import { CompareRule } from "@core/compare";
+import { DiffPoint, type DiffType } from "@core/diff";
+import { RuleBasedComparer } from "@implementation/compare";
+import { ComparingBasedDiffViewer } from "./ComparingBasedDiffViewer";
 import type { Comparer } from "@core/compare/Comparer";
 
 /**
- * Extended diff types emitted by {@link SubtreeShapeDiffViewer}.
+ * Extended diff types emitted by SubtreeShapeDiffViewer.
  *
- * - `"ADDED"` / `"DELETED"` — base types
- * - `"GROWN"` — the node gained children (delta = number of children added)
- * - `"SHRUNK"` — the node lost children (delta = number of children removed)
- * - `"DEPTH_CHANGED"` — the subtree became deeper or shallower (delta = height difference)
+ * - "ADDED" / "DELETED" — base types
+ * - "GROWN" — node gained children (delta = number added)
+ * - "SHRUNK" — node lost children (delta = number removed)
+ * - "DEPTH_CHANGED" — subtree became deeper or shallower (delta = height diff)
  */
 export type SubtreeShapeDiffType =
   | DiffType
@@ -17,48 +20,53 @@ export type SubtreeShapeDiffType =
   | "DEPTH_CHANGED";
 
 /**
- * An inner-lens {@link DiffViewer} that detects changes in subtree structure.
+ * Detects changes in subtree structure: GROWN, SHRUNK, DEPTH_CHANGED,
+ * ADDED, DELETED.
  *
- * For each matched node pair, checks whether children were added/removed
- * (GROWN/SHRUNK) or whether the subtree depth changed (DEPTH_CHANGED).
- * A single pair can emit multiple diff types.
- *
- * **Best used when:** you want to detect container-level changes —
- * lists gaining items, sections collapsing, trees growing new branches.
- *
- * **Precondition:** works best when nodes have stable surface identity
- * (tagName + attributes) so the {@link Comparer} can match them by what
- * they ARE rather than where they sit.
+ * Each instance ships with a canonical matching rule baked in — you do NOT
+ * need to supply a Comparer. The default rule matches on `tagName` and
+ * `attributeAnalytic` values, which is the standard "what kind of container
+ * is this" identity. Shape changes are then read off `childCount` and
+ * `height` of paired nodes.
  *
  * @example
  * ```ts
- * const viewer = new SubtreeShapeDiffViewer(comparer);
- * const diffs = viewer.highlight(oldTree, newTree);
- *
- * const grown = diffs.filter(d => d.type === "GROWN");
- * grown.forEach(d => {
- *   console.log(`${d.targetNode?.tagName} gained ${d.delta} children`);
- * });
+ * const viewer = new SubtreeShapeDiffViewer();
  * ```
  */
-export class SubtreeShapeDiffViewer implements DiffViewer<SubtreeShapeDiffType> {
-  private comparer: Comparer;
+export class SubtreeShapeDiffViewer extends ComparingBasedDiffViewer<SubtreeShapeDiffType> {
+  /**
+   * Canonical matching rule for shape diffing.
+   *
+   * `tagName + attributeAnalytic values_match` — standard surface identity.
+   * Once a pair is matched, child counts and heights are compared to derive
+   * GROWN / SHRUNK / DEPTH_CHANGED.
+   */
+  static readonly DEFAULT_RULE = new CompareRule([
+    { attType: "tagName", matchType: "match", logicType: "and" },
+    { attType: "attributeAnalytic", matchType: "values_match", logicType: "and" },
+  ]);
 
   /**
-   * @param comparer - The {@link Comparer} used to match nodes between trees.
+   * Builds a fresh Comparer pre-configured with the canonical rule.
+   * Called automatically by the no-argument constructor.
    */
-  constructor(comparer: Comparer) {
-    this.comparer = comparer;
+  static defaultComparer(): Comparer {
+    return new RuleBasedComparer(SubtreeShapeDiffViewer.DEFAULT_RULE);
   }
 
   /**
-   * Compares two trees and returns subtree-shape differences.
-   *
-   * @param reference - The old (baseline) tree.
-   * @param target - The new (current) tree.
-   * @returns Array of diff points classified as ADDED, DELETED, GROWN, SHRUNK,
-   *          or DEPTH_CHANGED.
+   * @param comparer - Optional override. Defaults to a RuleBasedComparer using
+   *        SubtreeShapeDiffViewer.DEFAULT_RULE.
+   * @param name - Optional source label. Defaults to "shape".
    */
+  constructor(
+    comparer: Comparer = SubtreeShapeDiffViewer.defaultComparer(),
+    name: string = "shape",
+  ) {
+    super(comparer, name);
+  }
+
   highlight(
     reference: ContextTree,
     target: ContextTree,
@@ -82,7 +90,7 @@ export class SubtreeShapeDiffViewer implements DiffViewer<SubtreeShapeDiffType> 
       points.push(new DiffPoint<SubtreeShapeDiffType>("ADDED", null, t));
     }
 
-    return points;
+    return this.stamp(points);
   }
 
   private classifyShape(

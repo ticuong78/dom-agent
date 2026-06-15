@@ -1,62 +1,82 @@
 import type { ContextNode, ContextTree } from "@core/context";
-import { DiffPoint, type DiffType, type DiffViewer } from "@core/diff";
+import { CompareRule } from "@core/compare";
+import { DiffPoint, type DiffType } from "@core/diff";
+import { RuleBasedComparer } from "@implementation/compare";
+import { ComparingBasedDiffViewer } from "./ComparingBasedDiffViewer";
 import type { Comparer } from "@core/compare/Comparer";
 
 /**
- * Extended diff types emitted by {@link TreeHierarchyDiffViewer}.
+ * Extended diff types emitted by TreeHierarchyDiffViewer.
  *
- * - `"ADDED"` / `"DELETED"` — base types (node appeared or disappeared)
- * - `"REORDERED"` — node stayed with the same parent but changed position
- * - `"REPARENTED"` — node moved to a different parent container
+ * - "ADDED" / "DELETED" — base types (node appeared or disappeared)
+ * - "REORDERED" — node stayed with the same parent but changed position
+ * - "REPARENTED" — node moved to a different parent container
  */
 export type TreeHierarchyDiffType = DiffType | "REORDERED" | "REPARENTED";
 
 /**
- * A context-lens {@link DiffViewer} that detects structural movement in the DOM.
+ * Detects structural movement in the DOM: REPARENTED, REORDERED, ADDED, DELETED.
  *
- * Analyses matched node pairs to determine if they were reordered within
- * their parent or reparented to an entirely different container. Also reports
- * unmatched nodes as additions or deletions.
+ * Each instance ships with a canonical matching rule baked in — you do NOT
+ * need to supply a Comparer. The default rule matches on `tagName` and
+ * `attributeAnalytic` values, deliberately omitting `depth` so that a node
+ * reparented across branches (whose depth changed) still pairs with its
+ * original.
  *
- * **Best used when:** the DOM structure is relatively stable and you want to
- * detect layout shifts, component reordering, or elements being moved between
- * containers.
- *
- * **Precondition:** works best when nodes have distinguishing surface
- * properties (tagName + attributes) so the {@link Comparer} can match them
- * across trees. On DOMs where every node is a bare `<div>`, matching quality
- * degrades.
+ * If you need different matching behaviour, pass a custom Comparer to the
+ * constructor; otherwise leave it blank and use the class as-is.
  *
  * @example
  * ```ts
- * const comparer = new RuleBasedComparer(rule);
- * const viewer = new TreeHierarchyDiffViewer(comparer);
- * const diffs = viewer.highlight(oldTree, newTree);
+ * // Default usage — class owns its semantics
+ * const viewer = new TreeHierarchyDiffViewer();
  *
- * diffs.forEach(d => {
- *   if (d.type === "REPARENTED") {
- *     console.log(`${d.referenceNode?.tagName} moved from ${d.referenceParentNode?.tagName} to ${d.targetParentNode?.tagName}`);
- *   }
- * });
+ * // Power-user override
+ * const viewer = new TreeHierarchyDiffViewer(myCustomComparer);
+ *
+ * // Remix the canonical rule
+ * const myRule = new CompareRule([
+ *   ...TreeHierarchyDiffViewer.DEFAULT_RULE.points,
+ *   { attType: "directTextHash", matchType: "match", logicType: "and" },
+ * ]);
+ * const viewer = new TreeHierarchyDiffViewer(new RuleBasedComparer(myRule));
  * ```
  */
-export class TreeHierarchyDiffViewer implements DiffViewer<TreeHierarchyDiffType> {
-  private comparer: Comparer;
+export class TreeHierarchyDiffViewer extends ComparingBasedDiffViewer<TreeHierarchyDiffType> {
+  /**
+   * Canonical matching rule for hierarchy diffing.
+   *
+   * `tagName + attributeAnalytic values_match`, NO depth constraint. Dropping
+   * depth is what enables matching nodes that were reparented to a different
+   * branch (and therefore changed depth). `values_match` keeps the pair stable
+   * when a node gains or loses an attribute — that change is reported by the
+   * mutation viewer downstream.
+   */
+  static readonly DEFAULT_RULE = new CompareRule([
+    { attType: "tagName", matchType: "match", logicType: "and" },
+    { attType: "attributeAnalytic", matchType: "values_match", logicType: "and" },
+  ]);
 
   /**
-   * @param comparer - The {@link Comparer} used to match nodes between trees.
+   * Builds a fresh Comparer pre-configured with the canonical rule.
+   * Called automatically by the no-argument constructor.
    */
-  constructor(comparer: Comparer) {
-    this.comparer = comparer;
+  static defaultComparer(): Comparer {
+    return new RuleBasedComparer(TreeHierarchyDiffViewer.DEFAULT_RULE);
   }
 
   /**
-   * Compares two trees and returns hierarchy-related differences.
-   *
-   * @param reference - The old (baseline) tree.
-   * @param target - The new (current) tree.
-   * @returns Array of diff points classified as ADDED, DELETED, REORDERED, or REPARENTED.
+   * @param comparer - Optional override. Defaults to a RuleBasedComparer using
+   *        TreeHierarchyDiffViewer.DEFAULT_RULE.
+   * @param name - Optional source label. Defaults to "hierarchy".
    */
+  constructor(
+    comparer: Comparer = TreeHierarchyDiffViewer.defaultComparer(),
+    name: string = "hierarchy",
+  ) {
+    super(comparer, name);
+  }
+
   highlight(
     reference: ContextTree,
     target: ContextTree,
@@ -80,7 +100,7 @@ export class TreeHierarchyDiffViewer implements DiffViewer<TreeHierarchyDiffType
       points.push(new DiffPoint<TreeHierarchyDiffType>("ADDED", null, t));
     }
 
-    return points;
+    return this.stamp(points);
   }
 
   private classifyPair(

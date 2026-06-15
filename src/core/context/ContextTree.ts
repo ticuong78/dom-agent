@@ -138,14 +138,12 @@ export class ContextTree implements ISerializable {
   }
 
   private computeTreeId(): string {
-    const content = this.allNodes
-      .map((node) => ContextTree.compositeKey(node))
-      .join(";");
+    const content = this.allNodes.map((node) => node.compositeKey()).join(";");
     return this.hasher.hash(content);
   }
 
   private index(node: ContextNode): void {
-    this.byCompositeKey.set(ContextTree.compositeKey(node), node);
+    this.byCompositeKey.set(node.compositeKey(), node);
 
     const sig = this.signature(node);
     const bucket = this.bySignature.get(sig) ?? [];
@@ -167,6 +165,7 @@ export class ContextTree implements ISerializable {
    * @returns A plain object snapshot of this tree.
    */
   serialize(): ContextTreeSnapshot {
+    // use this function to save in the DB
     return {
       treeId: this.treeId,
       createdDate: this.createdDate.toISOString(),
@@ -174,26 +173,6 @@ export class ContextTree implements ISerializable {
       nodeCount: this.allNodes.length,
       nodes: this.allNodes.map((node) => node.serialize()),
     };
-  }
-
-  // --- Composite Key (positional) ---
-
-  /**
-   * Computes a positional composite key for a node.
-   *
-   * The key encodes WHERE the node sits: `depth:nthChild/siblingCount|tagName|attributeCount|directTextHash`.
-   * Used for fast tree-internal deduplication. Not stable across DOM changes.
-   *
-   * @param node - The node to compute a key for.
-   * @returns A positional composite key string.
-   */
-  static compositeKey(node: ContextNode): string {
-    return [
-      `${node.depth}:${node.nthChild}/${node.siblingCount}`,
-      node.tagName,
-      node.attributeCount,
-      node.directTextHash,
-    ].join("|");
   }
 
   /**

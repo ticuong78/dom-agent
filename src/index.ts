@@ -18,4 +18,5 @@ export * from "@implementation/converter";
 export * from "@implementation/compare";
 export * from "@implementation/diff/viewer";
 export * from "@implementation/diff/reporter";
+export * from "@implementation/renderer";
 export * from "@implementation/theme";

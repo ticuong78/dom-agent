@@ -1,15 +1,18 @@
 import type { ContextNode, ContextTree } from "@core/context";
 import type { ValueType } from "@core/context/ContextNode";
-import { DiffPoint, type DiffType, type DiffViewer } from "@core/diff";
+import { CompareRule } from "@core/compare";
+import { DiffPoint, type DiffType } from "@core/diff";
+import { RuleBasedComparer, type GroupKeyFn } from "@implementation/compare";
+import { ComparingBasedDiffViewer } from "./ComparingBasedDiffViewer";
 import type { Comparer } from "@core/compare/Comparer";
 
 /**
- * Extended diff types emitted by {@link NodeMutationDiffViewer}.
+ * Extended diff types emitted by NodeMutationDiffViewer.
  *
- * - `"ADDED"` / `"DELETED"` — base types
- * - `"TAG_CHANGED"` — the element's tag name was swapped (e.g. `<div>` → `<section>`)
- * - `"ATTRIBUTE_CHANGED"` — attributes were added, removed, or modified
- * - `"TEXT_CHANGED"` — the node's direct text content was modified
+ * - "ADDED" / "DELETED" — base types
+ * - "TAG_CHANGED" — element's tag name was swapped (e.g. div -> section)
+ * - "ATTRIBUTE_CHANGED" — attributes were added, removed, or modified
+ * - "TEXT_CHANGED" — node's direct text content was modified
  */
 export type NodeMutationDiffType =
   | DiffType
@@ -18,48 +21,84 @@ export type NodeMutationDiffType =
   | "TEXT_CHANGED";
 
 /**
- * A node-lens {@link DiffViewer} that detects in-place property mutations.
+ * Detects in-place property mutations: TAG_CHANGED, ATTRIBUTE_CHANGED,
+ * TEXT_CHANGED, ADDED, DELETED.
  *
- * For each matched node pair, checks whether the tag name, attributes, or
- * text content changed. A single pair can emit multiple diff types (e.g. both
- * TAG_CHANGED and TEXT_CHANGED if both changed simultaneously).
+ * Each instance ships with a canonical matching rule baked in — you do NOT
+ * need to supply a Comparer. The default rule matches on `depth` and
+ * `attributeAnalytic` values, grouped by depth. Dropping `tagName` from the
+ * rule is what enables pairing a node whose tag changed (e.g. div -> section);
+ * grouping by depth keeps the search space tight.
  *
- * **Best used when:** the DOM hierarchy is relatively stable and you want
- * to detect content or styling changes on existing elements.
- *
- * **Precondition:** works best when the {@link Comparer} can produce meaningful
- * matches. If the entire tree is reorganised, positional matching will pair
- * wrong nodes and the mutations reported will be noise.
+ * If you need different matching behaviour, pass a custom Comparer to the
+ * constructor; otherwise leave it blank.
  *
  * @example
  * ```ts
- * const viewer = new NodeMutationDiffViewer(comparer);
- * const diffs = viewer.highlight(oldTree, newTree);
+ * // Default usage
+ * const viewer = new NodeMutationDiffViewer();
  *
- * const textChanges = diffs.filter(d => d.type === "TEXT_CHANGED");
- * textChanges.forEach(d => {
- *   console.log(`"${d.referenceNode?.directText}" → "${d.targetNode?.directText}"`);
- * });
+ * // Power-user override
+ * const viewer = new NodeMutationDiffViewer(myCustomComparer);
+ *
+ * // Remix
+ * const myRule = new CompareRule([
+ *   ...NodeMutationDiffViewer.DEFAULT_RULE.points,
+ *   { attType: "tagName", matchType: "match", logicType: "and" },
+ * ]);
+ * const viewer = new NodeMutationDiffViewer(
+ *   new RuleBasedComparer(myRule, NodeMutationDiffViewer.DEFAULT_GROUP_BY),
+ * );
  * ```
  */
-export class NodeMutationDiffViewer implements DiffViewer<NodeMutationDiffType> {
-  private comparer: Comparer;
+export class NodeMutationDiffViewer extends ComparingBasedDiffViewer<NodeMutationDiffType> {
+  /**
+   * Canonical matching rule for mutation diffing.
+   *
+   * `depth + attributeAnalytic values_match`, intentionally omitting `tagName`
+   * so that a node whose tag changed (div -> section) still pairs across the
+   * trees. `values_match` only checks shared attribute keys, so attribute
+   * adds/removes still allow pairing — the change is reported afterwards as
+   * ATTRIBUTE_CHANGED.
+   */
+  static readonly DEFAULT_RULE = new CompareRule([
+    { attType: "depth", matchType: "equal", logicType: "and" },
+    { attType: "attributeAnalytic", matchType: "values_match", logicType: "and" },
+  ]);
 
   /**
-   * @param comparer - The {@link Comparer} used to match nodes between trees.
+   * Canonical grouping for mutation diffing: by `depth`.
+   *
+   * Tight grouping is important because the rule above does NOT use `tagName`.
+   * Without depth-grouping, every tag would be a candidate for every other
+   * tag at any depth, blowing up the matching cost and producing nonsense
+   * pairings.
    */
-  constructor(comparer: Comparer) {
-    this.comparer = comparer;
+  static readonly DEFAULT_GROUP_BY: GroupKeyFn = (n: ContextNode) => String(n.depth);
+
+  /**
+   * Builds a fresh Comparer pre-configured with the canonical rule + grouping.
+   * Called automatically by the no-argument constructor.
+   */
+  static defaultComparer(): Comparer {
+    return new RuleBasedComparer(
+      NodeMutationDiffViewer.DEFAULT_RULE,
+      NodeMutationDiffViewer.DEFAULT_GROUP_BY,
+    );
   }
 
   /**
-   * Compares two trees and returns mutation-related differences.
-   *
-   * @param reference - The old (baseline) tree.
-   * @param target - The new (current) tree.
-   * @returns Array of diff points classified as ADDED, DELETED, TAG_CHANGED,
-   *          ATTRIBUTE_CHANGED, or TEXT_CHANGED.
+   * @param comparer - Optional override. Defaults to a RuleBasedComparer using
+   *        NodeMutationDiffViewer.DEFAULT_RULE and DEFAULT_GROUP_BY.
+   * @param name - Optional source label. Defaults to "mutation".
    */
+  constructor(
+    comparer: Comparer = NodeMutationDiffViewer.defaultComparer(),
+    name: string = "mutation",
+  ) {
+    super(comparer, name);
+  }
+
   highlight(
     reference: ContextTree,
     target: ContextTree,
@@ -83,7 +122,7 @@ export class NodeMutationDiffViewer implements DiffViewer<NodeMutationDiffType> 
       points.push(new DiffPoint<NodeMutationDiffType>("ADDED", null, t));
     }
 
-    return points;
+    return this.stamp(points);
   }
 
   private classifyMutations(
@@ -116,10 +155,6 @@ export class NodeMutationDiffViewer implements DiffViewer<NodeMutationDiffType> 
     return points;
   }
 
-  /**
-   * Compares attribute analytics between two nodes.
-   * Checks both the set of attribute keys and their analysed values.
-   */
   private attributesChanged(r: ContextNode, t: ContextNode): boolean {
     if (r.attributeCount !== t.attributeCount) return true;
 

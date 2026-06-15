@@ -1,19 +1,18 @@
 import { CheerioAdapter } from "@adapters/atom";
 import { SHA256HashAdapter } from "@adapters/hash";
 import { UUIDAdapter } from "@adapters/id";
-import { HTMLToContextConverter } from "@implementation/converter/HTMLToContextConverter";
-import { CompareRule } from "@core/compare/CompareRule";
-import {
-  RuleBasedComparer,
-  type GroupKeyFn,
-} from "@implementation/compare/RuleBasedComparer";
-import { TreeHierarchyDiffViewer } from "@implementation/diff/viewer/TreeHierarchyDiffViewer";
-import { NodeMutationDiffViewer } from "@implementation/diff/viewer/NodeMutationDiffViewer";
-import { SubtreeShapeDiffViewer } from "@implementation/diff/viewer/SubtreeShapeDiffViewer";
-import { HTMLDiffReporter } from "@implementation/diff/reporter/HTMLDiffReporter";
-import { JSONDiffReporter } from "@implementation/diff/reporter/JSONDiffReporter";
 import { DiffReport } from "@core/diff";
-import { DeepSpaceTheme } from "@implementation/theme/DeepSpaceTheme";
+import { HTMLToContextConverter } from "@implementation/converter";
+import { DeepSpaceTheme } from "@implementation/theme";
+import {
+  TreeHierarchyDiffViewer,
+  NodeMutationDiffViewer,
+  SubtreeShapeDiffViewer,
+  CompositeDiffViewer,
+  type StandardDiffType,
+  HTMLDiffReporter,
+  JSONDiffReporter,
+} from "../src";
 
 // ─── V1: Reference snapshot ─────────────────────────────────
 const html = `
@@ -149,112 +148,105 @@ const htmlV2 = `
 </html>
 `;
 
-// ─── Setup ───────────────────────────────────────────────────
-const cheerioAdapter = new CheerioAdapter();
-const rootNodeV1 = cheerioAdapter.parse(html);
-const rootNodeV2 = cheerioAdapter.parse(htmlV2);
-if (!rootNodeV1 || !rootNodeV2) throw new Error("Roots are empty.");
-
+// ─── Parse both snapshots into ContextTrees ─────────────────
+const adapter = new CheerioAdapter();
 const converter = new HTMLToContextConverter(
   new UUIDAdapter(),
   new SHA256HashAdapter(),
 );
-const treeV1 = converter.convert(rootNodeV1);
-const treeV2 = converter.convert(rootNodeV2);
+const treeV1 = converter.convert(adapter.parse(html)!);
+const treeV2 = converter.convert(adapter.parse(htmlV2)!);
+if (!treeV1 || !treeV2) throw new Error("Roots are empty.");
 
-// ─── Comparers (each viewer gets the comparer it needs) ─────
+// ─── Viewers ────────────────────────────────────────────────
+// Each viewer ships with its own canonical matching rule baked in.
+// Just construct and run.
+const hierarchyViewer = new TreeHierarchyDiffViewer();
+const mutationViewer = new NodeMutationDiffViewer();
+const shapeViewer = new SubtreeShapeDiffViewer();
 
-// Hierarchy: tagName + values_match, NO depth constraint
-// → allows matching reparented nodes that changed depth
-const hierarchyRule = new CompareRule([
-  { attType: "tagName", matchType: "match", logicType: "and" },
-  { attType: "attributeAnalytic", matchType: "values_match", logicType: "and" },
-]);
-const hierarchyComparer = new RuleBasedComparer(hierarchyRule);
-
-// Mutation: depth + values_match, grouped by depth (NO tagName)
-// → allows matching nodes that changed tag (TAG_CHANGED)
-// → values_match only checks shared keys, so added/removed attrs still pair (ATTRIBUTE_CHANGED)
-const groupByDepth: GroupKeyFn = (node) => String(node.depth);
-const mutationRule = new CompareRule([
-  { attType: "depth", matchType: "equal", logicType: "and" },
-  { attType: "attributeAnalytic", matchType: "values_match", logicType: "and" },
-]);
-const mutationComparer = new RuleBasedComparer(mutationRule, groupByDepth);
-
-// Shape: tagName + values_match
-// → standard structural comparison for subtree changes
-const shapeRule = new CompareRule([
-  { attType: "tagName", matchType: "match", logicType: "and" },
-  { attType: "attributeAnalytic", matchType: "values_match", logicType: "and" },
-]);
-const shapeComparer = new RuleBasedComparer(shapeRule);
-
-// ─── Viewers ─────────────────────────────────────────────────
-const hierarchyViewer = new TreeHierarchyDiffViewer(hierarchyComparer);
-const mutationViewer = new NodeMutationDiffViewer(mutationComparer);
-const shapeViewer = new SubtreeShapeDiffViewer(shapeComparer);
-
-// ─── Run & Report ────────────────────────────────────────────
+// ─── Run & log individually ─────────────────────────────────
 console.log("=== TreeHierarchyDiffViewer ===");
 console.log("  (expects: REPARENTED, REORDERED, ADDED, DELETED)");
-const hierarchyDiffs = hierarchyViewer.highlight(treeV1!, treeV2!);
+const hierarchyDiffs = hierarchyViewer.highlight(treeV1, treeV2);
 for (const d of hierarchyDiffs) {
-  const ref = d.referenceNode;
-  const tar = d.targetNode;
-  const label = (n: typeof ref) =>
+  const label = (n: typeof d.referenceNode) =>
     n
       ? `${n.tagName}.${n.attributeAnalytic?.class?.actualValue ?? "?"}`
       : "---";
-  console.log(`  ${d.type}: ${label(ref)} -> ${label(tar)}`);
+  console.log(
+    `  ${d.type}: ${label(d.referenceNode)} -> ${label(d.targetNode)}`,
+  );
 }
 
 console.log("\n=== NodeMutationDiffViewer ===");
 console.log(
   "  (expects: TAG_CHANGED, ATTRIBUTE_CHANGED, TEXT_CHANGED, ADDED, DELETED)",
 );
-const mutationDiffs = mutationViewer.highlight(treeV1!, treeV2!);
+const mutationDiffs = mutationViewer.highlight(treeV1, treeV2);
 for (const d of mutationDiffs) {
-  const ref = d.referenceNode;
-  const tar = d.targetNode;
-  const label = (n: typeof ref) =>
-    n
-      ? `${n.tagName}.${n.attributeAnalytic?.class?.actualValue ?? "?"}`
-      : "---";
-  console.log(`  ${d.type}: ${label(ref)} -> ${label(tar)}`);
-}
-
-console.log("\n=== SubtreeShapeDiffViewer ===");
-console.log("  (expects: GROWN, SHRUNK, DEPTH_CHANGED, ADDED, DELETED)");
-const shapeDiffs = shapeViewer.highlight(treeV1!, treeV2!);
-for (const d of shapeDiffs) {
-  const ref = d.referenceNode;
-  const tar = d.targetNode;
-  const label = (n: typeof ref) =>
+  const label = (n: typeof d.referenceNode) =>
     n
       ? `${n.tagName}.${n.attributeAnalytic?.class?.actualValue ?? "?"}`
       : "---";
   console.log(
-    `  ${d.type} (delta=${d.delta ?? 0}): ${label(ref)} -> ${label(tar)}`,
+    `  ${d.type}: ${label(d.referenceNode)} -> ${label(d.targetNode)}`,
   );
 }
 
-// ─── DiffReport ──────────────────────────────────────────────
+console.log("\n=== SubtreeShapeDiffViewer ===");
+console.log("  (expects: GROWN, SHRUNK, DEPTH_CHANGED, ADDED, DELETED)");
+const shapeDiffs = shapeViewer.highlight(treeV1, treeV2);
+for (const d of shapeDiffs) {
+  const label = (n: typeof d.referenceNode) =>
+    n
+      ? `${n.tagName}.${n.attributeAnalytic?.class?.actualValue ?? "?"}`
+      : "---";
+  console.log(
+    `  ${d.type} (delta=${d.delta ?? 0}): ${label(d.referenceNode)} -> ${label(d.targetNode)}`,
+  );
+}
 
-const shapeDiffReport = new DiffReport(shapeDiffs, "Shape Diff");
-const mutationDiffReport = new DiffReport(mutationDiffs, "Mutation Diff");
-const hierarchyDiffReport = new DiffReport(hierarchyDiffs, "Hierarchy Diff");
+// ─── Composite — reconciled view across all three viewers ──
+console.log("\n=== CompositeDiffViewer ===");
+console.log(
+  "  (deduplicated, contradictions filtered, each diff carries .source)",
+);
+const composite = new CompositeDiffViewer<StandardDiffType>([
+  hierarchyViewer,
+  mutationViewer,
+  shapeViewer,
+]);
+const compositeDiffs = composite.highlight(treeV1, treeV2);
+for (const d of compositeDiffs) {
+  const label = (n: typeof d.referenceNode) =>
+    n
+      ? `${n.tagName}.${n.attributeAnalytic?.class?.actualValue ?? "?"}`
+      : "---";
+  console.log(
+    `  [${d.source}] ${d.type}: ${label(d.referenceNode)} -> ${label(d.targetNode)}`,
+  );
+}
+console.log(
+  `\n  union=${hierarchyDiffs.length + mutationDiffs.length + shapeDiffs.length} composite=${compositeDiffs.length}`,
+);
 
-// ─── Reports ─────────────────────────────────────────────────
-const deepSpace = new DeepSpaceTheme();
+// ─── Wrap each viewer's output in a DiffReport ──────────────
+const hierarchyReport = new DiffReport(hierarchyDiffs, "Hierarchy Diff");
+const mutationReport = new DiffReport(mutationDiffs, "Mutation Diff");
+const shapeReport = new DiffReport(shapeDiffs, "Shape Diff");
+const compositeReport = new DiffReport(compositeDiffs, "Composite Diff");
 
-// ─── Reports ─────────────────────────────────────────────────
-const hTMLDiffReporter = new HTMLDiffReporter(deepSpace);
-const jSONDiffReporter = new JSONDiffReporter();
+// ─── Reports — HTML + JSON ──────────────────────────────────
+const html_reporter = new HTMLDiffReporter(new DeepSpaceTheme());
+const json_reporter = new JSONDiffReporter();
 
-hTMLDiffReporter.report(hierarchyDiffReport, "report/hierarchyDiffs.html");
-hTMLDiffReporter.report(mutationDiffReport, "report/mutationDiffs.html");
-hTMLDiffReporter.report(shapeDiffReport, "report/shapeDiffs.html");
-jSONDiffReporter.report(hierarchyDiffReport, "report/hierarchyDiffs.json");
-jSONDiffReporter.report(mutationDiffReport, "report/mutationDiffs.json");
-jSONDiffReporter.report(shapeDiffReport, "report/shapeDiffs.json");
+html_reporter.report(hierarchyReport, "report/hierarchyDiffs.html");
+html_reporter.report(mutationReport, "report/mutationDiffs.html");
+html_reporter.report(shapeReport, "report/shapeDiffs.html");
+html_reporter.report(compositeReport, "report/compositeDiffs.html");
+
+json_reporter.report(hierarchyReport, "report/hierarchyDiffs.json");
+json_reporter.report(mutationReport, "report/mutationDiffs.json");
+json_reporter.report(shapeReport, "report/shapeDiffs.json");
+json_reporter.report(compositeReport, "report/compositeDiffs.json");

@@ -32,6 +32,16 @@ export type DiffPointSnapshot = {
 
   /** Optional quantitative delta (e.g. number of children added/removed). */
   delta?: number;
+
+  /**
+   * Name of the viewer that produced this diff point.
+   *
+   * Built-in viewers stamp their canonical short name ("hierarchy", "mutation",
+   * "shape") via AbstractDiffViewer.stamp. The CompositeDiffViewer preserves
+   * whatever source each child viewer self-stamped. Only present when the
+   * producing viewer set it.
+   */
+  source?: string;
 };
 
 /**
@@ -45,20 +55,18 @@ export type DiffPointSnapshot = {
  * beyond the base `ADDED`/`DELETED` (e.g. `"REPARENTED"`, `"TEXT_CHANGED"`).
  *
  * @typeParam T - The diff type enum this point uses. Defaults to {@link DiffType}.
- *
- * @example
- * ```ts
- * // A node was deleted
- * const point = new DiffPoint("DELETED", oldNode, null);
- *
- * // A node was reparented (custom type from TreeHierarchyDiffViewer)
- * const point = new DiffPoint("REPARENTED", oldNode, newNode, oldParent, newParent);
- *
- * // A subtree grew by 3 children
- * const point = new DiffPoint("GROWN", oldNode, newNode, null, null, 3);
- * ```
  */
 export class DiffPoint<T extends string = DiffType> implements ISerializable {
+  /**
+   * Name of the viewer that produced this diff point.
+   *
+   * Mutable on purpose so a viewer can stamp itself onto each point it emits
+   * without forcing a new constructor signature. Set by
+   * AbstractDiffViewer.stamp. Left undefined when a producer chooses not to
+   * label its output.
+   */
+  source?: string;
+
   /**
    * @param type - The classification of this diff (e.g. "DELETED", "ATTRIBUTE_CHANGED").
    * @param referenceNode - The node from the reference (old) tree, or `null` for additions.
@@ -103,6 +111,10 @@ export class DiffPoint<T extends string = DiffType> implements ISerializable {
 
     if (this.delta !== undefined) {
       serialized.delta = this.delta;
+    }
+
+    if (this.source !== undefined) {
+      serialized.source = this.source;
     }
 
     return serialized;

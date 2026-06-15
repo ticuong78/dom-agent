@@ -1,6 +1,6 @@
 import type { ContextNode } from "@core/atoms";
 import type { DiffPoint, DiffReport } from "@core/diff";
-import type { Renderer } from "@core/renderer/Renderer";
+import type { Renderer } from "@core/renderer";
 
 export class DashboardLikeTheme implements Renderer {
   public render(diffReport: DiffReport): string {

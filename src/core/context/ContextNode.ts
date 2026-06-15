@@ -278,4 +278,21 @@ export class ContextNode implements ISerializable {
       childIds: this.children.map((c) => c.id),
     };
   }
+
+  /**
+   * Computes a positional composite key for a node.
+   *
+   * The key encodes WHERE the node sits: `depth:nthChild/siblingCount|tagName|attributeCount|directTextHash`.
+   * Used for fast tree-internal deduplication. Not stable across DOM changes.
+   *
+   * @returns A positional composite key string.
+   */
+  compositeKey(): string {
+    return [
+      `${this.depth}:${this.nthChild}/${this.siblingCount}`,
+      this.tagName,
+      this.attributeCount,
+      this.directTextHash,
+    ].join("|");
+  }
 }

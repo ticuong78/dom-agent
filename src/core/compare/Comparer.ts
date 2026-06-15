@@ -1,5 +1,7 @@
 import type { ContextNode } from "@core/atoms";
 import type { ContextTree } from "@core/context";
+import type { CompareRule } from "./CompareRule";
+import type { GroupKeyFn } from "@implementation/compare";
 
 /**
  * A matched pair of nodes that the comparer considers "the same entity"
@@ -14,48 +16,38 @@ export type ComparePair = {
 };
 
 /**
- * The result of comparing two {@link ContextTree} instances.
+ * The result of comparing two ContextTree instances.
  *
- * - `pairs` — nodes successfully matched across trees
- * - `referenceOnly` — nodes in the old tree with no match (deletion candidates)
- * - `targetOnly` — nodes in the new tree with no match (addition candidates)
+ * - pairs - nodes successfully matched across trees
+ * - referenceOnly - nodes in the old tree with no match (deletion candidates)
+ * - targetOnly - nodes in the new tree with no match (addition candidates)
  */
 export type CompareResult = {
-  /** Matched node pairs across reference and target trees. */
   pairs: ComparePair[];
-
-  /** Nodes present only in the reference tree (potential deletions). */
   referenceOnly: ContextNode[];
-
-  /** Nodes present only in the target tree (potential additions). */
   targetOnly: ContextNode[];
 };
 
 /**
- * Interface for matching nodes between two {@link ContextTree} instances.
+ * Interface for matching nodes between two ContextTree instances.
  *
- * A `Comparer` does NOT classify changes — that is a {@link DiffViewer}'s job.
- * It only answers: "which node in the target corresponds to which node in
- * the reference?"
- *
- * Different implementations use different matching strategies:
- * - By surface identity (tagName + attributes)
- * - By positional similarity (depth + nthChild)
- * - By subtree shape (height + childCount)
- *
- * @example
- * ```ts
- * const comparer: Comparer = new RuleBasedComparer(rule);
- * const { pairs, referenceOnly, targetOnly } = comparer.compare(oldTree, newTree);
- * ```
+ * A Comparer does NOT classify changes — that is a DiffViewer's job. It only
+ * answers: "which node in the target corresponds to which node in the
+ * reference?"
  */
 export interface Comparer {
   /**
    * Matches nodes between a reference tree and a target tree.
-   *
-   * @param reference - The old (baseline) tree.
-   * @param target - The new (current) tree.
-   * @returns A {@link CompareResult} with pairs, unmatched reference nodes, and unmatched target nodes.
    */
   compare(reference: ContextTree, target: ContextTree): CompareResult;
+
+  /**
+   * Replace the matching rule. Allows configure-after-construct workflows.
+   */
+  setCompareRule(compareRule: CompareRule): void;
+
+  /**
+   * Replace the grouping strategy. Allows configure-after-construct workflows.
+   */
+  setGroupBy(groupBy: GroupKeyFn): void;
 }

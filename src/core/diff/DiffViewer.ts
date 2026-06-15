@@ -1,5 +1,10 @@
 import type { ContextTree } from "@core/context";
 import type { DiffPoint, DiffType } from "./DiffPoint";
+import type {
+  TreeHierarchyDiffViewer,
+  NodeMutationDiffViewer,
+  SubtreeShapeDiffViewer,
+} from "@implementation/diff/viewer";
 
 /**
  * The analytical perspective (lens) through which a viewer examines differences.

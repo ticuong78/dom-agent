@@ -8,73 +8,53 @@ import type {
 import type { CompareRule } from "@core/compare/CompareRule";
 
 /**
- * Extracts a grouping key from a {@link ContextNode}.
+ * Extracts a grouping key from a ContextNode.
  *
- * Nodes in different groups are never compared against each other,
- * reducing the search space from O(n*m) to O(n*k) where k is the
- * average bucket size.
- *
- * @param node - The node to extract a group key from.
- * @returns A string key. Nodes with different keys are never paired.
+ * Nodes in different groups are never compared against each other, reducing
+ * the search space from O(n*m) to O(n*k) where k is the average bucket size.
  */
 export type GroupKeyFn = (node: ContextNode) => string;
 
 /**
- * Default grouping strategy: by `tagName`.
- *
- * Two nodes with different tag names are almost never "the same entity,"
- * making this a safe coarse filter.
+ * Default grouping strategy: by tagName.
  */
 export const groupByTagName: GroupKeyFn = (node) => node.tagName;
 
 /**
- * A {@link Comparer} implementation that matches nodes using a {@link CompareRule}
- * for identity evaluation and a grouping function for performance.
+ * A Comparer implementation that matches nodes using a CompareRule for
+ * identity evaluation and a grouping function for performance.
  *
- * **Algorithm:**
- * 1. Flatten both trees into node arrays
- * 2. Bucket target nodes by grouping key (reduces search space)
- * 3. For each reference node, find candidates in the same bucket
- * 4. Evaluate {@link CompareRule} for each candidate
- * 5. Among passing candidates, pick the closest by `depth * 100 + nthChild`
- * 6. Unmatched nodes go to `referenceOnly` / `targetOnly`
- *
- * @example
- * ```ts
- * const rule = new CompareRule([
- *   { attType: "tagName", matchType: "match", logicType: "and" },
- *   { attType: "attributeAnalytic", matchType: "keys_match", logicType: "and" },
- * ]);
- *
- * const comparer = new RuleBasedComparer(rule);
- * const { pairs, referenceOnly, targetOnly } = comparer.compare(oldTree, newTree);
- * ```
+ * Both the rule and the grouping function can be supplied at construction
+ * time OR set later via setCompareRule / setGroupBy. compare() will throw
+ * if invoked before a rule has been set; this is a deliberate fail-loud
+ * choice — calling compare() with no rule would silently produce an empty
+ * pairing (every node looking like ADDED/DELETED), which is hard to debug.
  */
 export class RuleBasedComparer implements Comparer {
-  private rule: CompareRule;
+  private rule: CompareRule | undefined;
   private groupBy: GroupKeyFn;
 
-  /**
-   * @param rule - The {@link CompareRule} used to determine if two nodes are the same entity.
-   * @param groupBy - Optional grouping function to bucket nodes before comparison.
-   *        Defaults to {@link groupByTagName}.
-   */
-  constructor(rule: CompareRule, groupBy: GroupKeyFn = groupByTagName) {
+  constructor(rule?: CompareRule, groupBy: GroupKeyFn = groupByTagName) {
     this.rule = rule;
     this.groupBy = groupBy;
   }
 
-  /**
-   * Matches nodes between two trees using the configured rule and grouping.
-   *
-   * @param reference - The old (baseline) tree.
-   * @param target - The new (current) tree.
-   * @returns A {@link CompareResult} with matched pairs and unmatched nodes.
-   */
-  compare(
-    reference: ContextTree,
-    target: ContextTree,
-  ): CompareResult {
+  setGroupBy(groupBy: GroupKeyFn): void {
+    this.groupBy = groupBy;
+  }
+
+  setCompareRule(compareRule: CompareRule): void {
+    this.rule = compareRule;
+  }
+
+  compare(reference: ContextTree, target: ContextTree): CompareResult {
+    if (!this.rule) {
+      throw new Error(
+        "RuleBasedComparer.compare() called before a CompareRule was set. " +
+          "Pass a CompareRule to the constructor, or call setCompareRule(...) first.",
+      );
+    }
+
     const refNodes = reference.nodes();
     const tarNodes = target.nodes();
 
@@ -95,7 +75,7 @@ export class RuleBasedComparer implements Comparer {
       const candidates = tarBuckets.get(key);
       if (!candidates) continue;
 
-      const match = this.bestMatch(ref, candidates, tarUsed);
+      const match = this.bestMatch(this.rule, ref, candidates, tarUsed);
       if (match) {
         pairs.push({ reference: ref, target: match });
         tarUsed.add(match);
@@ -113,8 +93,13 @@ export class RuleBasedComparer implements Comparer {
   /**
    * Finds the best matching target node for a given reference node.
    * Among candidates that pass the rule, picks the one closest by position.
+   *
+   * `rule` is passed in (not read from `this.rule`) so we don't need the
+   * optional-chaining `?.` here — the top-level compare() has already
+   * proved the rule exists.
    */
   private bestMatch(
+    rule: CompareRule,
     ref: ContextNode,
     candidates: ContextNode[],
     used: Set<ContextNode>,
@@ -124,7 +109,7 @@ export class RuleBasedComparer implements Comparer {
 
     for (const tar of candidates) {
       if (used.has(tar)) continue;
-      if (!this.rule.evaluate(ref, tar)) continue;
+      if (!rule.evaluate(ref, tar)) continue;
 
       const dist =
         Math.abs(ref.depth - tar.depth) * 100 +
