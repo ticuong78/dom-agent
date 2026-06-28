@@ -5,13 +5,13 @@ import type { DiffPoint, DiffPointSnapshot } from "./DiffPoint";
  * JSON-serializable snapshot of a {@link DiffSummary}.
  */
 export type DiffSummarySnapshot = {
-  /** ISO 8601 date string of when the report was generated. */
-  reportDate: string;
+  /** ISO 8601 date string of when the summary was generated. */
+  createdAt: string;
 
-  /** Optional human-readable name for this report. */
-  reportName: string | undefined;
+  /** Optional human-readable label for this summary. */
+  label: string | undefined;
 
-  /** Total number of diff points in this report. */
+  /** Total number of diff points in this summary. */
   totalDiffs: number;
 
   /** All serialized diff points. */
@@ -23,50 +23,50 @@ export type DiffSummarySnapshot = {
  * changes between two DOM snapshots.
  *
  * `DiffSummary` is the output of a diff pipeline — it groups diff points
- * together with metadata (date, name, count) and provides serialization
+ * together with metadata (date, label, count) and provides serialization
  * for persistence or rendering.
  *
  * @example
  * ```ts
  * const points = viewer.highlight(oldTree, newTree);
- * const report = new DiffSummary(points, "homepage-daily-check");
+ * const summary = new DiffSummary(points, "homepage-daily-check");
  *
  * // Serialize for storage
- * const json = JSON.stringify(report.serialize());
+ * const json = JSON.stringify(summary.serialize());
  *
  * // Pass to a reporter for HTML/JSON output
- * reporter.report(report, "output/report.html");
+ * reporter.report(summary, "output/summary.html");
  * ```
  */
 export class DiffSummary implements ISerializable {
-  /** Timestamp of when this report was created. */
-  readonly reportDate: Date = new Date();
+  /** Timestamp of when this summary was created. */
+  readonly createdAt: Date = new Date();
 
   /** Total number of diff points. */
   readonly totalDiffs: number;
 
   /**
    * @param diffPoints - Array of diff points from one or more viewers.
-   * @param reportName - Optional name for this report. Defaults to the creation timestamp.
+   * @param label - Optional label for this summary. Defaults to the creation timestamp.
    */
   constructor(
     readonly diffPoints: DiffPoint<string>[],
-    readonly reportName?: string,
+    readonly label?: string,
   ) {
-    if (!reportName) reportName = `${this.reportDate.toLocaleString()}`;
+    if (!label) label = `${this.createdAt.toLocaleString()}`;
 
     this.totalDiffs = diffPoints.length;
   }
 
   /**
-   * Serializes the report into a JSON-safe object.
+   * Serializes the summary into a JSON-safe object.
    *
    * @returns A {@link DiffSummarySnapshot} with all primitive fields.
    */
   serialize(): DiffSummarySnapshot {
     const snapshot: DiffSummarySnapshot = {
-      reportDate: this.reportDate.toLocaleDateString(),
-      reportName: this.reportName,
+      createdAt: this.createdAt.toISOString(),
+      label: this.label,
       totalDiffs: this.totalDiffs,
       diffPoints: this.diffPoints.map((p: DiffPoint<string>) => p.serialize()),
     };

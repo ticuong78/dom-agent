@@ -1,6 +1,14 @@
 # @ticuong78/dom-agent — Release Notes
 
-## [Unreleased]
+## v3.0.1
+
+Changes made after the `dagent-v3.0.0` tag.
+
+### Changes
+
+Changed `DiffSummary` properties' name from using `report` prefix to use more general meaning properties' name.
+
+## v3.0.0
 
 Changes made after the `dagent-v2.0.0` tag.
 
