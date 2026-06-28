@@ -56,39 +56,18 @@ export class CompositeDiffViewer<
       }
     }
 
-    // 3. Filter contradictions
-    const filtered: DiffPoint<T>[] = [];
-    for (const point of all) {
-      if (
-        point.type === "DELETED" &&
-        point.referenceNode &&
-        matchedRefs.has(point.referenceNode)
-      ) {
-        continue;
-      }
-      if (
-        point.type === "ADDED" &&
-        point.targetNode &&
-        matchedTars.has(point.targetNode)
-      ) {
-        continue;
-      }
-      filtered.push(point);
-    }
-
-    // 4. Deduplicate by (type, refId, tarId)
+    // 3. Deduplicate by (type, refId, tarId)
     const seen = new Set<string>();
     const deduped: DiffPoint<T>[] = [];
-    for (const point of filtered) {
-      const refId = point.referenceNode ? point.referenceNode.id : "";
-      const tarId = point.targetNode ? point.targetNode.id : "";
-      const key = point.type + "|" + refId + "|" + tarId;
+    for (const point of all) {
+      const refId = point.referenceNode?.id ?? "";
+      const tarId = point.targetNode?.id ?? "";
+      const key = `${point.type}|${refId}|${tarId}`;
       if (seen.has(key)) continue;
       seen.add(key);
       deduped.push(point);
     }
 
-    // 5. Return; survivors keep their original viewer's source
     return deduped;
   }
 }

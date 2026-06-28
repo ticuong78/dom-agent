@@ -8,10 +8,12 @@ The name "pre-process" undersells what happens here. This is the core enrichment
 
 ## How it works
 
-The step is driven by a single class, `HTMLToContextConverter`, defined at `src/implementation/converter/HTMLToContextConverter.ts`. It depends on two adapters injected through the constructor:
+The step is driven by a single class, `HTMLToContextConverter`, defined at `src/implementation/converter/HTMLToContextConverter.ts`. It accepts two optional adapters via the constructor:
 
-- An `IDAdapter` (e.g. `UUIDAdapter`) — generates a unique `id` for every node so the resulting tree can be serialized without circular references.
-- A `HashAdapter` (e.g. `SHA256HashAdapter`) — hashes each node's direct text and computes a deterministic `treeId` for the whole tree.
+- An `IDAdapter` — generates a unique `id` for every node so the resulting tree can be serialized without circular references. Defaults to `new UUIDAdapter()`.
+- A `HashAdapter` — hashes each node's direct text and computes a deterministic `treeId` for the whole tree. Defaults to `new SHA256HashAdapter()`.
+
+Both parameters have defaults, so `new HTMLToContextConverter()` is valid for the common case. Pass custom implementations when you need a different ID scheme or hash algorithm.
 
 Calling `converter.convert(htmlNode)` returns either a fully populated `ContextTree` or `null` if the root is not a tag node (text/comment/script/style roots are rejected).
 

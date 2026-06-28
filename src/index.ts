@@ -16,3 +16,9 @@ export * from "@adapters/id";
 export * from "@implementation/converter";
 export * from "@implementation/compare";
 export * from "@implementation/diff/viewer";
+
+export type DiffViewerTypes =
+  | "mutation"
+  | "hierarchy"
+  | "composition"
+  | "subshape";

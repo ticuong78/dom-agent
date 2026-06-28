@@ -1,5 +1,26 @@
 # @ticuong78/dom-agent — Release Notes
 
+## [Unreleased]
+
+Changes made after the `dagent-v2.0.0` tag.
+
+### Breaking Changes
+
+- **Removed `Renderer` interface and all implementations.** `src/core/renderer/Renderer.ts`, `src/implementation/renderer/JSONRenderer.ts`, and their index files are deleted. To get a JSON string from a `DiffSummary`, call `JSON.stringify(summary.serialize())` directly.
+- **Removed `DiffReporter` interface and all implementations.** `src/core/diff/DiffReporter.ts`, `src/implementation/diff/reporter/HTMLDiffReporter.ts`, `src/implementation/diff/reporter/JSONDiffReporter.ts`, and their index files are deleted. There is no longer a built-in file-writing reporter.
+- **Removed HTML themes.** `DashboardLikeTheme` and `DeepSpaceTheme` are deleted.
+- **`CompositeDiffViewer` reconciliation rule changed.** The "matched beats unmatched" filter step has been removed. Previously, any `DELETED` for a matched reference node and any `ADDED` for a matched target node were silently dropped. Now, `ADDED` and `DELETED` survive regardless of whether the same node appears in a non-`ADDED`/`DELETED` diff type. The sole post-fan-out operation is deduplication by `(type, referenceNode.id, targetNode.id)`.
+
+### Changed
+
+- **`HTMLToContextConverter` constructor parameters now have defaults.** Both `idGenerator` (defaults to `new UUIDAdapter()`) and `hasher` (defaults to `new SHA256HashAdapter()`) are optional. `new HTMLToContextConverter()` is now valid.
+
+### Added
+
+- **`DiffViewerTypes` union type.** Exported from the top-level index. Enumerates the canonical `name` string of every built-in viewer: `"mutation" | "hierarchy" | "composition" | "subshape"`. Use it to type-narrow on `DiffPoint.source` or to build viewer registries.
+
+---
+
 ## v2.0.0
 
 Major release. The headline addition is `CompositeDiffViewer` — composing the three built-in viewers into a single, deduplicated, contradiction-free output. Alongside it, every viewer now owns its canonical matching rule, every `DiffPoint` carries a `source` stamp tracing it back to the viewer that produced it, and the renderer/reporter pair has been cleanly separated so the JSON (or HTML) string is reachable without touching the filesystem. A handful of small interface tightenings make misuse fail loudly instead of silently.
@@ -35,11 +56,11 @@ The three built-in viewers used to be parametric shells — their behaviour depe
 
 v2 fixes this. Each viewer now ships with its canonical matching rule baked in:
 
-| Viewer                       | Default rule                                            | Grouping       |
-| ---------------------------- | ------------------------------------------------------- | -------------- |
-| `TreeHierarchyDiffViewer`    | `tagName` + `attributeAnalytic values_match` (no depth) | by `tagName`   |
-| `NodeMutationDiffViewer`     | `depth` + `attributeAnalytic values_match` (no tagName) | by `depth`     |
-| `SubtreeShapeDiffViewer`     | `tagName` + `attributeAnalytic values_match`            | by `tagName`   |
+| Viewer                    | Default rule                                            | Grouping     |
+| ------------------------- | ------------------------------------------------------- | ------------ |
+| `TreeHierarchyDiffViewer` | `tagName` + `attributeAnalytic values_match` (no depth) | by `tagName` |
+| `NodeMutationDiffViewer`  | `depth` + `attributeAnalytic values_match` (no tagName) | by `depth`   |
+| `SubtreeShapeDiffViewer`  | `tagName` + `attributeAnalytic values_match`            | by `tagName` |
 
 The rule is exposed as `DEFAULT_RULE` static (and `DEFAULT_GROUP_BY` where applicable) for inspection and remixing. Constructors accept an optional `Comparer`; the default is built from the static rule. Calling `new NodeMutationDiffViewer()` is now sufficient.
 
@@ -114,7 +135,7 @@ The `Comparer` interface gained `setCompareRule(rule)` and `setGroupBy(fn)` to s
 interface Comparer {
   compare(reference: ContextTree, target: ContextTree): CompareResult;
   setCompareRule(compareRule: CompareRule): void; // new
-  setGroupBy(groupBy: GroupKeyFn): void;          // new
+  setGroupBy(groupBy: GroupKeyFn): void; // new
 }
 ```
 

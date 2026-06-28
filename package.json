@@ -5,7 +5,7 @@
     "email": "lephamhungcuong219@gmail.com",
     "url": "https://github.com/ticuong78"
   },
-  "version": "2.0.0",
+  "version": "3.0.0",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -35,8 +35,7 @@
     "@vitest/coverage-v8": "^4.1.5",
     "tsc-alias": "^1.8.17",
     "tsx": "^4.21.0",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.5"
+    "typescript": "^6.0.3"
   },
   "files": [
     "dist",
@@ -51,12 +50,7 @@
   "scripts": {
     "clean": "rm -rf dist",
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json --resolve-full-paths && node scripts/fix-paths.mjs",
-    "dev": "tsx examples/demo.ts",
-    "test": "vitest run --reporter=verbose",
-    "test:unit": "vitest run --reporter=verbose tests/unit",
-    "test:integration": "vitest run --reporter=verbose tests/integration",
-    "test:coverage": "vitest run --coverage",
-    "test:watch": "vitest"
+    "dev": "tsx examples/demo.ts"
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

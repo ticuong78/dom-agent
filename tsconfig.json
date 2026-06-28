@@ -5,7 +5,7 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "target": "esnext",
-    "types": ["node", "vitest/globals"],
+    "types": ["node"],
     "esModuleInterop": true,
     "sourceMap": true,
     "declaration": true,
@@ -21,10 +21,9 @@
     "paths": {
       "@core/*": ["./src/core/*"],
       "@adapters/*": ["./src/adapters/*"],
-      "@implementation/*": ["./src/implementation/*"],
-      "@tests/*": ["./tests/*"]
+      "@implementation/*": ["./src/implementation/*"]
     }
   },
-  "include": ["src/**/*", "tests/**/*", "examples/**/*"],
+  "include": ["src/**/*", "examples/**/*"],
   "exclude": ["dist", "node_modules"]
 }

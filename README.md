@@ -21,7 +21,7 @@
 - **`CompositeDiffViewer`** — runs the three built-in viewers over the same tree pair and reconciles their outputs with a single rule: "matched beats unmatched." Drops contradictory `ADDED`/`DELETED` that another viewer has already paired, deduplicates the rest, and preserves each child's `source` stamp. Empirically reduces noise by ~75% on real DOM diffs without losing signal.
 - **Viewer self-ownership.** Each built-in viewer ships with its own canonical matching rule (`DEFAULT_RULE` static). `new NodeMutationDiffViewer()` is now enough to detect mutations — the class owns its semantics. No more wiring up `CompareRule`s by hand for every viewer.
 - **`source` field on every `DiffPoint`.** Optional string stamped by the emitting viewer (`"hierarchy"`, `"mutation"`, `"shape"`, or whatever name you pass). Survives composition — you can always trace a diff back to the leaf viewer that produced it. Serialized into `DiffPointSnapshot`.
-- **New `Renderer` separation.** `JSONRenderer` is now a first-class `Renderer` implementation. `JSONDiffReporter` becomes a thin wrapper around any `Renderer` (default `JSONRenderer`). The SaaS-style pattern of "give me the string, I'll write it myself" works out of the box — call `new JSONRenderer().render(report)` and skip the filesystem entirely.
+- **`StandardDiffType` union.** `TreeHierarchyDiffType | NodeMutationDiffType | SubtreeShapeDiffType` exported for callers composing the standard trio.
 - **Fail-loud `RuleBasedComparer`.** Calling `compare()` before setting a rule now throws with a clear remediation message instead of silently returning empty pairs.
 
 See the [migration notes](#migration-from-v1x) at the bottom for breaking-change details.
@@ -73,10 +73,7 @@ import {
 
 // 1. Parse two HTML snapshots into ContextTrees
 const adapter = new CheerioAdapter();
-const converter = new HTMLToContextConverter(
-  new UUIDAdapter(),
-  new SHA256HashAdapter(),
-);
+const converter = new HTMLToContextConverter(); // UUIDAdapter + SHA256HashAdapter by default
 const tree1 = converter.convert(adapter.parse(htmlBefore)!)!;
 const tree2 = converter.convert(adapter.parse(htmlAfter)!)!;
 
@@ -133,15 +130,15 @@ Instead of comparing two opaque hashes, dom-agent compares individual fields —
 
 The atomic unit of diff output:
 
-| Field                 | Purpose                                                                  |
-| --------------------- | ------------------------------------------------------------------------ |
-| `type`                | What kind of change (`REPARENTED`, `TAG_CHANGED`, `GROWN`, ...)          |
-| `referenceNode`       | Pointer into the old tree (`null` for additions)                         |
-| `targetNode`          | Pointer into the new tree (`null` for deletions)                         |
-| `referenceParentNode` | Parent of the reference node (relevant for hierarchy diffs)              |
-| `targetParentNode`    | Parent of the target node (relevant for hierarchy diffs)                 |
-| `delta`               | Optional numeric quantity (e.g. number of children gained)               |
-| `source`              | **New in v2.** Name of the producing viewer (e.g. `"hierarchy"`)         |
+| Field                 | Purpose                                                          |
+| --------------------- | ---------------------------------------------------------------- |
+| `type`                | What kind of change (`REPARENTED`, `TAG_CHANGED`, `GROWN`, ...)  |
+| `referenceNode`       | Pointer into the old tree (`null` for additions)                 |
+| `targetNode`          | Pointer into the new tree (`null` for deletions)                 |
+| `referenceParentNode` | Parent of the reference node (relevant for hierarchy diffs)      |
+| `targetParentNode`    | Parent of the target node (relevant for hierarchy diffs)         |
+| `delta`               | Optional numeric quantity (e.g. number of children gained)       |
+| `source`              | **New in v2.** Name of the producing viewer (e.g. `"hierarchy"`) |
 
 The `source` field lets you trace every diff back to the leaf viewer that produced it — invaluable when reading composite output or building viewer-specific filters downstream.
 
@@ -205,13 +202,13 @@ Running multiple viewers and compositing results gives richer signals than any s
 
 ### CompositeDiffViewer (new in v2)
 
-Composes any number of `DiffViewer`s, reconciles their outputs, and returns a single deduplicated `DiffPoint[]`. Implements `DiffViewer<T>` so you can plug it into reporters, themes, or further composites.
+Composes any number of `DiffViewer`s and returns a single deduplicated `DiffPoint[]`. Implements `DiffViewer<T>` so it can be nested or used anywhere a viewer is expected.
 
-**Reconciliation rule (singular).** Matched beats unmatched: if any child viewer paired reference-node `R` with target-node `T` (via any non-`ADDED`/`DELETED` diff type), every `DELETED` for `R` and every `ADDED` for `T` from other viewers is dropped.
+**Deduplication only.** After fanning out to all child viewers, the composite collapses points sharing the same `(type, referenceNode.id, targetNode.id)` key. `ADDED` and `DELETED` survive even when the same node appears in other diff types from sibling viewers — all classifications are preserved.
 
-**What composite does NOT do** (deliberate v1 scope):
+**What composite does NOT do:**
 
-- Resolve multi-target conflicts (two viewers pairing the same R to different targets). Both points appear; detect by grouping output by `referenceNode.id`.
+- Resolve multi-target conflicts (two viewers pairing the same R to different targets). Both points appear; group by `referenceNode.id` to detect.
 - Suppress derived shape diffs (a `REPARENTED` widget still produces `SHRUNK`/`GROWN` on its old/new parents).
 - Merge multiple diffs about the same node into one entry.
 
@@ -249,19 +246,13 @@ const viewer2 = new NodeMutationDiffViewer(myCustomComparer);
 
 ### Reporting
 
-`DiffReport` wraps a list of diff points with metadata. From there, two paths:
-
-- **`Renderer.render(report)` -> `string`** — pure transformation, no I/O. Use `JSONRenderer` for JSON, the bundled themes (`DeepSpaceTheme`, `DashboardLikeTheme`) for themed HTML, or implement your own `Renderer` for anything else.
-- **`DiffReporter.report(report, path)`** — writes the rendered string to disk. `HTMLDiffReporter` and `JSONDiffReporter` are the bundled implementations.
-
-When you don't want the filesystem write — uploading to S3, returning from an HTTP handler, storing in a database — call the `Renderer` directly:
+`DiffSummary` wraps a list of diff points with metadata (`reportDate`, `reportName`, `totalDiffs`). Call `serialize()` to get a JSON-safe `DiffSummarySnapshot` — all node references are flattened to primitive snapshots, safe for `JSON.stringify()` and database storage.
 
 ```typescript
-const json = new JSONRenderer().render(diffReport);
-await db.diffs.insertOne(JSON.parse(json));
+const summary = new DiffSummary(diffs, "homepage-daily");
+const json = JSON.stringify(summary.serialize());
+// store / send / log as needed
 ```
-
-Two built-in themes for HTML reports: **DeepSpaceTheme** (dark, dashboard-like) and **DashboardLikeTheme** (clean, card-based). Implement the `Renderer` interface to create your own.
 
 ---
 
@@ -275,21 +266,17 @@ dom-agent/
       context/                  ContextNode, ContextTree
       converter/                Converter interface
       crypto/                   HashAdapter, IDAdapter
-      diff/                     DiffPoint, DiffViewer, DiffReport, DiffReporter
+      diff/                     DiffPoint, DiffViewer, DiffSummary
       interface/                ISerializable
       plain/                    HTMLNode, HTMLAdapter
-      renderer/                 Renderer interface
 
     implementation/             Concrete strategies
       compare/                  RuleBasedComparer
-      converter/                HTMLToContextConverter
+      converter/                HTMLToContextConverter (default adapters)
       diff/
         viewer/                 AbstractDiffViewer, ComparingBasedDiffViewer,
                                 TreeHierarchy, NodeMutation, SubtreeShape,
                                 CompositeDiffViewer + StandardDiffType
-        reporter/               HTMLDiffReporter, JSONDiffReporter
-      renderer/                 JSONRenderer
-      theme/                    DeepSpaceTheme, DashboardLikeTheme
 
     adapters/                   Third-party wrappers
       atom/                     CheerioAdapter
@@ -350,8 +337,6 @@ const viewer = new TreeHierarchyDiffViewer();
 ```
 
 `DiffPoint` gains an optional `source` field (mutable, post-hoc). Consumers that ignore unknown fields on the snapshot are unaffected; strict JSON schema validators may need to allow it.
-
-`JSONDiffReporter` constructor signature changed to accept an optional `Renderer` (defaults to `JSONRenderer`). No-argument calls continue to work.
 
 ---
 

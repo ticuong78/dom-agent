@@ -6,6 +6,8 @@ import {
   type HTMLNode,
   type IDAdapter,
 } from "../../core";
+import { UUIDAdapter } from "@adapters/id";
+import { SHA256HashAdapter } from "@adapters/hash";
 
 type ParentSurface = {
   tagName: string;
@@ -39,7 +41,10 @@ export class HTMLToContextConverter {
    * @param idGenerator - An {@link IDAdapter} for generating unique node IDs.
    * @param hasher - A {@link HashAdapter} for hashing text content and computing treeId.
    */
-  constructor(idGenerator: IDAdapter, hasher: HashAdapter) {
+  constructor(
+    idGenerator: IDAdapter = new UUIDAdapter(),
+    hasher: HashAdapter = new SHA256HashAdapter(),
+  ) {
     this.idGenerator = idGenerator;
     this.hasher = hasher;
   }
