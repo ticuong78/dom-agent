@@ -1,6 +1,5 @@
 // --- Core ---
 export * from "@core/interface";
-export * from "@core/renderer";
 export * from "@core/plain";
 export * from "@core/context";
 export * from "@core/crypto";
@@ -17,6 +16,3 @@ export * from "@adapters/id";
 export * from "@implementation/converter";
 export * from "@implementation/compare";
 export * from "@implementation/diff/viewer";
-export * from "@implementation/diff/reporter";
-export * from "@implementation/renderer";
-export * from "@implementation/theme";
