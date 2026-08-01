@@ -30,10 +30,34 @@ interface HTMLParser {}
  * @see HTMLAdapter — the interface this class implements
  */
 export class CheerioParser implements HTMLParser {
+  // intrigate selector patterns:
+  //    relative
+  //    declarative
+  //    relative from parents
+  //    declarative from parents
+
+  // for 1 selector:
+  //    found 0 matched element
+  //    found only 1 matched element
+  //    found more than 1 matched element
+
+  // for 2+ selectors:
+  //    
+
+  /**
+   * Inject data to elements in the dom
+   * @param $ Cheerio's JQuery-alike alias
+   * @param selectors an array of selectors' path
+   * @param data an array of key-value pair. Each key represents a name of data to be added to the all matched elements by the selectors with the value. If the given name starts with a "data" prefix such as "data-is-excluded", change to "is-excluded" only to avoid duplications in data attribute's name chain
+   * 
+   * @returns void, successfully mutate the input DOM under the shape of $
+   */
   private static _injectData(
     $: cheerio.CheerioAPI,
-    selectors: string[],
-    data: Record<string, any>,
+    selectors: string[], // need to check for this, since user's input should be checked
+    data: Record<string, any>, // happy case: non-data-prefix in the name, edge case: with "data" prefix in the name
+    // happy case: is-excluded
+    // edge case: data-is-excluded. The data prefix should be replace with empty space.
   ) {
     for (const selector of selectors) {
       $(selector).each((i, el) => {
