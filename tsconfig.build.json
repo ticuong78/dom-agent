@@ -10,5 +10,11 @@
     "sourceMap": true
   },
   "include": ["src/**/*"],
-  "exclude": ["dist", "node_modules", "tests", "examples"]
+  "exclude": [
+    "dist",
+    "node_modules",
+    "tests",
+    "examples",
+    "./src/_playground.ts"
+  ]
 }

@@ -1,14 +1,4 @@
-import { CheerioAdapter } from "@adapters/atom";
-import { SHA256HashAdapter } from "@adapters/hash";
-import { UUIDAdapter } from "@adapters/id";
-import { HTMLToContextConverter } from "@implementation/converter";
-import {
-  TreeHierarchyDiffViewer,
-  NodeMutationDiffViewer,
-  SubtreeShapeDiffViewer,
-  CompositeDiffViewer,
-  type StandardDiffType,
-} from "../src";
+import { diff } from "../src";
 
 // ─── V1: Reference snapshot ─────────────────────────────────
 const html = `
@@ -143,24 +133,13 @@ const htmlV2 = `
 </body>
 </html>
 `;
-// 1. Parse two HTML snapshots into ContextTrees
-const adapter = new CheerioAdapter();
-const converter = new HTMLToContextConverter(
-  new UUIDAdapter(),
-  new SHA256HashAdapter(),
-);
-const tree1 = converter.convert(adapter.parse(html)!)!;
-const tree2 = converter.convert(adapter.parse(htmlV2)!)!;
-
-// 2. Compose the three built-in viewers — each owns its canonical rule
-const composite = new CompositeDiffViewer<StandardDiffType>([
-  new TreeHierarchyDiffViewer(),
-  new NodeMutationDiffViewer(),
-  new SubtreeShapeDiffViewer(),
-]);
 
 // 3. Detect changes — output is deduplicated and free of viewer contradictions
-const diffs = composite.highlight(tree1, tree2);
+const diffs = diff({
+  first: html,
+  second: htmlV2,
+  // exclude: ["body > div > nav"],
+});
 
 for (const diff of diffs) {
   console.log(

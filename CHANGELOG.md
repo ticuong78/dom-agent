@@ -1,5 +1,32 @@
 # @ticuong78/dom-agent — Release Notes
 
+# V4.0.0
+
+Changes made after the `dagent-v3.0.1` tag.
+
+### Breaking Changes
+
+- **Flattened project structure.** The `core/`, `implementation/`, and `adapters/` layers are collapsed into a flat module layout: `convert/`, `compare/`, `diffs/`, `selector.ts`, `types.ts`, `utils.ts`. All public imports come from the top-level `diff()` function.
+- **Removed adapter pattern.** `HashAdapter`, `IDAdapter`, `HTMLAdapter` interfaces and their implementations (`SHA256HashAdapter`, `UUIDAdapter`, `CheerioAdapter`) are replaced by plain functions and classes (`defaultHash`, `CheerioParser`, counter-based IDs).
+- **Removed `AbstractDiffViewer` + `ComparingBasedDiffViewer` dual hierarchy.** Replaced by a single `AbstractDiffViewer<T>` base class. Subclasses implement only `classifyPair(r, t)`.
+- **Removed `DiffSummary`, `DiffReporter`, `Renderer`, and HTML themes.** Use `JSON.stringify(diffPoint.serialize())` directly.
+- **`CompositeDiffViewer` constructor changed.** Viewers are no longer required at construction — use `registerViewers()` to add them after.
+
+### Added
+
+- **`diff()` function.** Single entry point for the entire pipeline. Accepts `{ first, second, types?, exclude? }` and returns `DiffPoint<StandardDiffType>[]`.
+- **`AttributePool`** (`convert/pool.ts`). Counts the frequency of each `attr=value` pair across the entire tree. Used to compute data-driven selector confidence scores — no hardcoded assumptions about which attributes are "unique."
+- **`selectorScore` + `bestAttr` on `ContextNode`.** Computed after tree indexing by querying the `AttributePool`. `selectorScore` = `1 / count` of the most unique attribute on the node. Included in `ContextNodeSnapshot` serialization.
+- **`suggestSelector()` on `ContextNode`.** Suggests a CSS selector to target this node, using a 3-tier strategy: self selector (when the node's own attributes are unique enough), path from best ancestor (when an ancestor has higher confidence), or full path from root (fallback). Every segment includes `:nth-child()` for disambiguation. Returns `{ selector, confidence, strategy }`.
+- **`SelectorSuggestion` type.** Exported from the top-level index.
+- **`exclude` parameter on `diff()`.** Array of CSS selectors for elements to ignore during comparison.
+
+### Changed
+
+- **`AbstractDiffViewer` now owns the full `highlight()` method.** The compare → classify → ADDED/DELETED → stamp flow is implemented once. Subclasses only implement `protected abstract classifyPair(r, t)`.
+- **`ContextTree` builds an `AttributePool` during indexing** and scores all nodes after the index pass completes.
+- **`ContextNodeSnapshot` includes `selectorScore` and `bestAttr`.**
+
 ## v3.0.1
 
 Changes made after the `dagent-v3.0.0` tag.

@@ -5,9 +5,9 @@
     "email": "lephamhungcuong219@gmail.com",
     "url": "https://github.com/ticuong78"
   },
-  "version": "3.0.0",
+  "version": "4.0.0",
   "main": "./dist/index.js",
-  "module": "./dist/index.js",
+  "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "type": "module",
   "exports": {
@@ -34,6 +34,7 @@
     "@types/node": "^25.6.0",
     "@vitest/coverage-v8": "^4.1.5",
     "tsc-alias": "^1.8.17",
+    "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3"
   },

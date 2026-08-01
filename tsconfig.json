@@ -17,12 +17,7 @@
     "moduleDetection": "force",
     "skipLibCheck": true,
     "verbatimModuleSyntax": true,
-    "noUncheckedSideEffectImports": true,
-    "paths": {
-      "@core/*": ["./src/core/*"],
-      "@adapters/*": ["./src/adapters/*"],
-      "@implementation/*": ["./src/implementation/*"]
-    }
+    "noUncheckedSideEffectImports": true
   },
   "include": ["src/**/*", "examples/**/*"],
   "exclude": ["dist", "node_modules"]
