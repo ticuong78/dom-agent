@@ -5,7 +5,7 @@ export default defineConfig({
     projects: [
       {
         test: {
-          name: "unit tests",
+          name: "unit",
           include: ["./src/**/__tests__/**/*.{test,spec}.ts"], // include all test from subfolder counting from src folder
           exclude: [
             "./src/__tests__/**/*.{test,spec}.ts",
@@ -15,7 +15,7 @@ export default defineConfig({
       },
       {
         test: {
-          name: "integration tests",
+          name: "integration",
           include: ["./src/__tests__/**/*.{test,spec}.ts"],
           exclude: ["./__tests__/**/*.{test,spec}.ts"],
         },

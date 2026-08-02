@@ -24,6 +24,7 @@ type ParentSurface = {
 export class ContextConverter {
   private readonly hash: HashFn;
   private counter = 0;
+  private reservedIds = new Set<string>();
 
   /**
    * @param hash - Optional hash function for text content and treeId.
@@ -45,10 +46,35 @@ export class ContextConverter {
    */
   convert(currentNode: HTMLNode, depth: number = 0) {
     this.counter = 0;
+    this.reservedIds = this._collectPassingIds(currentNode);
 
     const root = this._convert(currentNode, depth, null);
 
     return new ContextTree(root, this.hash);
+  }
+
+  /**
+   * Pre-scan the HTMLNode tree to collect all explicit passingIds.
+   * Used to prevent counter-generated IDs from colliding with them.
+   */
+  private _collectPassingIds(node: HTMLNode): Set<string> {
+    const ids = new Set<string>();
+    const stack: HTMLNode[] = [node];
+    while (stack.length > 0) {
+      const n = stack.pop()!;
+      if (n.passingId != null) ids.add(n.passingId);
+      for (const child of n.children) stack.push(child);
+    }
+    return ids;
+  }
+
+  /** Generate a counter-based ID that doesn't collide with any passingId. */
+  private _nextCounterId(): string {
+    let id = String(this.counter++);
+    while (this.reservedIds.has(id)) {
+      id = String(this.counter++);
+    }
+    return id;
   }
 
   private _convert(
@@ -59,7 +85,7 @@ export class ContextConverter {
     if (currentNode.type !== "tag")
       throw new Error("Does not support parse any element but tag.");
 
-    const id = currentNode.passingId ?? String(this.counter++); // neu passingId duoc define thi khong dung String counter
+    const id = currentNode.passingId ?? this._nextCounterId();
 
     // Count attributes directly — avoids calling analyzeAttributes() twice
     const currentAttributeCount = Object.keys(currentNode.attributes).length;

@@ -52,7 +52,7 @@ export type HTMLNode = {
   nthChild: number;
 
   isExcluded: boolean;
-  passingId?: string;
+  passingId: string | undefined;
 };
 
 export type Profile = {

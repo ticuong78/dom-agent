@@ -153,6 +153,9 @@ export type ContextNodeSnapshot = {
 
   /** Attribute key that gave the highest confidence, or `null`. */
   bestAttr: string | null;
+
+  /** Whether this node was marked for exclusion via a profile. */
+  isExcluded: boolean;
 };
 
 /**
@@ -297,6 +300,7 @@ export class ContextNode implements ISerializable {
       childIds: this.children.map((c) => c.id),
       selectorScore: this.selectorScore,
       bestAttr: this.bestAttr,
+      isExcluded: this.isExcluded,
     };
   }
 
@@ -314,6 +318,7 @@ export class ContextNode implements ISerializable {
       this.tagName,
       this.attributeCount,
       this.directTextHash,
+      `${this.parentTagName ?? ""}@${this.parentDepth ?? ""}`,
     ].join("|");
   }
 
@@ -611,6 +616,6 @@ export class ContextTree implements ISerializable {
 
   /** Returns the total number of nodes in the tree. */
   size(): number {
-    return this.byCompositeKey.size;
+    return this.allNodes.length;
   }
 }

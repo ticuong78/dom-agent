@@ -73,17 +73,11 @@ export abstract class AbstractDiffViewer<
     this.name = name;
   }
 
-  private _filterIgnored(pairs: ComparePair[]): ComparePair[] {
-    return pairs.filter((el, i) => !el.reference.isExcluded); // bỏ qua những thằng bị ignore
-  }
-
   highlight(reference: ContextTree, target: ContextTree): DiffPoint<T>[] {
     const { pairs, referenceOnly, targetOnly } = this.comparer.compare(
       reference,
       target,
     );
-
-    // const pairs = this._filterIgnored(unFilteredPairs); // lỗi logic nghiêm trọng chỗ này, code chỉ đang filter ignore ra khỏi pair mà thôi!
 
     const points: DiffPoint<T>[] = [];
 

@@ -91,34 +91,13 @@ export class CompareRule {
    * @returns `true` if the nodes are considered the same entity by this rule.
    */
   evaluate(a: ContextNode, b: ContextNode): boolean {
-    let result = true;
+    if (this.points.length === 0) return true;
 
-    for (const point of this.points) {
-      let pointResult: boolean;
+    let result = this._evaluatePoint(a, b, this.points[0]!);
 
-      if (point.attType === "attributeAnalytic") {
-        pointResult = this.evaluateAttributes(
-          a.attributeAnalytic,
-          b.attributeAnalytic,
-          point.matchType,
-        );
-      } else {
-        const aVal = a[point.attType];
-        const bVal = b[point.attType];
-
-        if (typeof aVal === "number" && typeof bVal === "number") {
-          const p = point as NumericComparePoint;
-          if (p.matchType === "equal") pointResult = aVal === bVal;
-          else if (p.matchType === "less") pointResult = aVal < bVal;
-          else pointResult = aVal > bVal;
-        } else {
-          const p = point as StringComparePoint;
-          pointResult =
-            p.matchType === "match"
-              ? String(aVal) === String(bVal)
-              : String(aVal) !== String(bVal);
-        }
-      }
+    for (let i = 1; i < this.points.length; i++) {
+      const point = this.points[i]!;
+      const pointResult = this._evaluatePoint(a, b, point);
 
       if (point.logicType === "or") {
         result = result || pointResult;
@@ -128,6 +107,38 @@ export class CompareRule {
     }
 
     return result;
+  }
+
+  /**
+   * Evaluates a single ComparePoint against two nodes.
+   */
+  private _evaluatePoint(
+    a: ContextNode,
+    b: ContextNode,
+    point: ComparePoint,
+  ): boolean {
+    if (point.attType === "attributeAnalytic") {
+      return this.evaluateAttributes(
+        a.attributeAnalytic,
+        b.attributeAnalytic,
+        point.matchType,
+      );
+    }
+
+    const aVal = a[point.attType];
+    const bVal = b[point.attType];
+
+    if (typeof aVal === "number" && typeof bVal === "number") {
+      const p = point as NumericComparePoint;
+      if (p.matchType === "equal") return aVal === bVal;
+      if (p.matchType === "less") return aVal < bVal;
+      return aVal > bVal;
+    }
+
+    const p = point as StringComparePoint;
+    return p.matchType === "match"
+      ? String(aVal) === String(bVal)
+      : String(aVal) !== String(bVal);
   }
 
   /**
