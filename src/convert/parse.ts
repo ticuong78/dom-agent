@@ -42,26 +42,27 @@ export class CheerioParser implements HTMLParser {
   //    found more than 1 matched element
 
   // for 2+ selectors:
-  //    
+  //
 
   /**
    * Inject data to elements in the dom
    * @param $ Cheerio's JQuery-alike alias
    * @param selectors an array of selectors' path
    * @param data an array of key-value pair. Each key represents a name of data to be added to the all matched elements by the selectors with the value. If the given name starts with a "data" prefix such as "data-is-excluded", change to "is-excluded" only to avoid duplications in data attribute's name chain
-   * 
+   *
    * @returns void, successfully mutate the input DOM under the shape of $
    */
   private static _injectData(
     $: cheerio.CheerioAPI,
     selectors: string[], // need to check for this, since user's input should be checked
-    data: Record<string, any>, // happy case: non-data-prefix in the name, edge case: with "data" prefix in the name
-    // happy case: is-excluded
-    // edge case: data-is-excluded. The data prefix should be replace with empty space.
+    data: readonly [name: string, value: unknown], // happy case: non-data-prefix in the name, edge case: with "data" prefix in the name
   ) {
+    const [rawName, value] = data;
+    const name = rawName.replace(/^data-/, "");
+
     for (const selector of selectors) {
       $(selector).each((i, el) => {
-        $(el).data(String(data[0]).replaceAll("data-", ""), data[1]); // loai bo bat ky prefix data- nao de tranh unexpected behaviour
+        $(el).data(name, value); // loai bo bat ky prefix data- nao de tranh unexpected behaviour
       });
     }
   }
@@ -91,13 +92,8 @@ export class CheerioParser implements HTMLParser {
       [EXCLUDING_KEY, true],
     );
 
-    profiles.forEach((profile) => {
-      this._injectData(
-        // injecting ids
-        $,
-        inclusions.map((el) => el.selector),
-        [ID_KEY, profile.id],
-      );
+    inclusions.forEach((profile) => {
+      this._injectData($, [profile.selector], [ID_KEY, profile.id]);
     });
 
     // this._injectNeedCheckData(, unused but may need for later, therefore, were commented
@@ -105,7 +101,7 @@ export class CheerioParser implements HTMLParser {
     //   inclusions.map((el) => el.selector),
     // );
 
-    const body = $("body").children().first().get(0);
+    const body = $("body")[0];
 
     if (!body)
       throw new Error("Cannot parse your html content. Please check again.");
@@ -128,7 +124,8 @@ export class CheerioParser implements HTMLParser {
       .map((c) => this._normalize($, c as Element)); // post-order
 
     const isExcluded: boolean = Boolean($(el).data(EXCLUDING_KEY));
-    const passingId: string = String($(el).data(ID_KEY));
+    const rawId = $(el).data(ID_KEY);
+    const passingId = rawId != null ? String(rawId) : undefined;
 
     const directText = el.children
       .filter((c) => c.type === "text")
