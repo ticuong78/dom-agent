@@ -1,7 +1,7 @@
 import * as cheerio from "cheerio";
 import { Element, Text } from "domhandler";
-import type { HTMLNode, Profile } from "../types";
-import { partitionArray } from "../utils";
+import type { HTMLNode, Profile } from "@types";
+import { partitionArray } from "@utils";
 
 const EXCLUDING_KEY = "is-excluded"; // after injecting -> data-is-excluded
 const ID_KEY = "htmlnode-id";

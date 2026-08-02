@@ -1,7 +1,7 @@
-import type { ISerializable } from "../interface/ISerializable";
-import { defaultHash, type HashFn } from "../utils";
+import type { ISerializable } from "@interface/ISerializable";
+import { defaultHash, type HashFn } from "@utils";
 import { AttributePool } from "./pool";
-import { suggestSelector, type SelectorSuggestion } from "../selector";
+import { suggestSelector, type SelectorSuggestion } from "@selector";
 
 /**
  * Analysed representation of a single attribute value.

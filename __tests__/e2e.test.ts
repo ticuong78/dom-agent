@@ -284,9 +284,9 @@ describe("e2e: V1 → V2 full diff", () => {
     });
 
     it("includes a.lnk-help (SHRUNK child)", () => {
-      expect(
-        deleted.some((d) => d.referenceNode!.directText === "Help"),
-      ).toBe(true);
+      expect(deleted.some((d) => d.referenceNode!.directText === "Help")).toBe(
+        true,
+      );
     });
 
     it("includes div.uncle (TRAP — attr values differ)", () => {
@@ -317,9 +317,9 @@ describe("e2e: V1 → V2 full diff", () => {
     });
 
     it("includes footer.old-footer", () => {
-      expect(
-        deleted.some((d) => d.referenceNode!.tagName === "footer"),
-      ).toBe(true);
+      expect(deleted.some((d) => d.referenceNode!.tagName === "footer")).toBe(
+        true,
+      );
     });
 
     it("includes p.bye (footer child)", () => {
@@ -353,9 +353,9 @@ describe("e2e: V1 → V2 full diff", () => {
     });
 
     it("includes span.tag[sarah] (TRAP child counterpart)", () => {
-      expect(
-        added.some((d) => d.targetNode!.directText === "Aunt Sarah"),
-      ).toBe(true);
+      expect(added.some((d) => d.targetNode!.directText === "Aunt Sarah")).toBe(
+        true,
+      );
     });
 
     it("includes section.bulletin (hierarchy can't pair tag change)", () => {
@@ -379,17 +379,15 @@ describe("e2e: V1 → V2 full diff", () => {
     });
 
     it("includes 2 new images (ph-two, ph-three)", () => {
-      const newImgs = added.filter(
-        (d) => d.targetNode!.tagName === "img",
-      );
+      const newImgs = added.filter((d) => d.targetNode!.tagName === "img");
 
       expect(newImgs).toHaveLength(2);
     });
 
     it("includes div.reply (new nested reply)", () => {
-      expect(
-        added.some((d) => d.targetNode!.directText === "Reply to A"),
-      ).toBe(true);
+      expect(added.some((d) => d.targetNode!.directText === "Reply to A")).toBe(
+        true,
+      );
     });
 
     it("includes section.promo and h2.promo-title", () => {
@@ -751,20 +749,20 @@ const profileV2 = `
 
 const profiles: import("../src/types").Profile[] = [
   // ── Exclusions ──
-  { selector: ".ad-banner", id: null, isExcluded: true },   // EXCL-A
-  { selector: ".tracker", id: null, isExcluded: true },      // EXCL-B
-  { selector: ".sidebar", id: null, isExcluded: true },      // EXCL-C (parent only)
-  { selector: ".toast", id: null, isExcluded: true },        // EXCL-D (matches 3)
+  { selector: ".ad-banner", id: null, isExcluded: true }, // EXCL-A
+  { selector: ".tracker", id: null, isExcluded: true }, // EXCL-B
+  { selector: ".sidebar", id: null, isExcluded: true }, // EXCL-C (parent only)
+  { selector: ".toast", id: null, isExcluded: true }, // EXCL-D (matches 3)
 
   // ── Inclusions with explicit IDs ──
-  { selector: ".product", id: "prod", isExcluded: false },   // ID-A
-  { selector: ".price", id: "price", isExcluded: false },    // ID-A
+  { selector: ".product", id: "prod", isExcluded: false }, // ID-A
+  { selector: ".price", id: "price", isExcluded: false }, // ID-A
 
   // ── Inclusion with null id → counter fallback ──
-  { selector: ".status", id: null, isExcluded: false },      // ID-B
+  { selector: ".status", id: null, isExcluded: false }, // ID-B
 
   // ── Inclusion that collides (matches 2 elements → same id) ──
-  { selector: ".card", id: "card", isExcluded: false },      // ID-C
+  { selector: ".card", id: "card", isExcluded: false }, // ID-C
 ];
 
 describe("e2e with profiles", () => {
@@ -779,12 +777,7 @@ describe("e2e with profiles", () => {
   // ── Exclusion: invisible nodes ─────────────────────────────
 
   describe("excluded nodes produce zero diffs", () => {
-    const excludedClasses = [
-      "ad-banner",
-      "tracker",
-      "sidebar",
-      "toast",
-    ];
+    const excludedClasses = ["ad-banner", "tracker", "sidebar", "toast"];
 
     it("no excluded node appears as referenceNode in any diff", () => {
       for (const d of diffs) {
@@ -799,8 +792,7 @@ describe("e2e with profiles", () => {
       const trackerDiffs = diffs.filter((d) => {
         const refClass =
           d.referenceNode?.attributeAnalytic["class"]?.actualValue;
-        const tarClass =
-          d.targetNode?.attributeAnalytic["class"]?.actualValue;
+        const tarClass = d.targetNode?.attributeAnalytic["class"]?.actualValue;
         return refClass === "tracker" || tarClass === "tracker";
       });
       expect(trackerDiffs).toHaveLength(0);
@@ -845,8 +837,11 @@ describe("e2e with profiles", () => {
 
   describe("EXCL-C: excluded parent with non-excluded child", () => {
     it("tip is REPARENTED (parent sidebar gained data-folded → parentAttributeCount 2→3)", () => {
-      const tipReparented = findOne(diffs, "hierarchy", "REPARENTED", (d) =>
-        d.referenceNode!.directText === "Useful tip",
+      const tipReparented = findOne(
+        diffs,
+        "hierarchy",
+        "REPARENTED",
+        (d) => d.referenceNode!.directText === "Useful tip",
       );
       expect(tipReparented).toBeDefined();
       expect(tipReparented!.referenceParentNode!.attributeCount).toBe(2);
@@ -854,9 +849,13 @@ describe("e2e with profiles", () => {
     });
 
     it("tip text change detected (mutation viewer still pairs it)", () => {
-      const tipText = findOne(diffs, "mutation", "TEXT_CHANGED", (d) =>
-        d.referenceNode!.directText === "Useful tip" &&
-        d.targetNode!.directText === "Updated tip",
+      const tipText = findOne(
+        diffs,
+        "mutation",
+        "TEXT_CHANGED",
+        (d) =>
+          d.referenceNode!.directText === "Useful tip" &&
+          d.targetNode!.directText === "Updated tip",
       );
       expect(tipText).toBeDefined();
     });
@@ -889,8 +888,11 @@ describe("e2e with profiles", () => {
     });
 
     it("price TEXT_CHANGED has refId 'price'", () => {
-      const priceText = findOne(diffs, "mutation", "TEXT_CHANGED", (d) =>
-        d.referenceNode?.id === "price",
+      const priceText = findOne(
+        diffs,
+        "mutation",
+        "TEXT_CHANGED",
+        (d) => d.referenceNode?.id === "price",
       );
       expect(priceText).toBeDefined();
       expect(priceText!.referenceNode!.directText).toBe("$10");
@@ -915,9 +917,13 @@ describe("e2e with profiles", () => {
     });
 
     it("status TEXT_CHANGED detected", () => {
-      const statusText = findOne(diffs, "mutation", "TEXT_CHANGED", (d) =>
-        d.referenceNode?.directText === "Online" &&
-        d.targetNode?.directText === "Offline",
+      const statusText = findOne(
+        diffs,
+        "mutation",
+        "TEXT_CHANGED",
+        (d) =>
+          d.referenceNode?.directText === "Online" &&
+          d.targetNode?.directText === "Offline",
       );
       expect(statusText).toBeDefined();
     });
@@ -927,9 +933,7 @@ describe("e2e with profiles", () => {
 
   describe("ID-C: same selector gives both cards id='card'", () => {
     it("both cards have id 'card'", () => {
-      const cardDiffs = diffs.filter(
-        (d) => d.referenceNode?.id === "card",
-      );
+      const cardDiffs = diffs.filter((d) => d.referenceNode?.id === "card");
       // Multiple diffs reference nodes with id "card"
       expect(cardDiffs.length).toBeGreaterThanOrEqual(2);
     });
@@ -962,8 +966,11 @@ describe("e2e with profiles", () => {
 
   describe("excluded elements cause nthChild shifts → REORDERED", () => {
     it("product REORDERED (nthChild shifted because excluded nodes before it are gone)", () => {
-      const productReorder = findOne(diffs, "hierarchy", "REORDERED", (d) =>
-        d.referenceNode?.id === "prod",
+      const productReorder = findOne(
+        diffs,
+        "hierarchy",
+        "REORDERED",
+        (d) => d.referenceNode?.id === "prod",
       );
       expect(productReorder).toBeDefined();
       expect(productReorder!.referenceNode!.nthChild).toBeGreaterThan(
@@ -972,8 +979,13 @@ describe("e2e with profiles", () => {
     });
 
     it("status REORDERED for same reason", () => {
-      const statusReorder = findOne(diffs, "hierarchy", "REORDERED", (d) =>
-        d.referenceNode?.attributeAnalytic["data-s"]?.actualValue === "status",
+      const statusReorder = findOne(
+        diffs,
+        "hierarchy",
+        "REORDERED",
+        (d) =>
+          d.referenceNode?.attributeAnalytic["data-s"]?.actualValue ===
+          "status",
       );
       expect(statusReorder).toBeDefined();
     });
@@ -983,9 +995,13 @@ describe("e2e with profiles", () => {
 
   describe("shape changes from structural removal", () => {
     it("app SHRUNK: childCount 10→8 (tracker removed, 2 toasts removed, footer added)", () => {
-      const appShrunk = findOne(diffs, "shape", "SHRUNK", (d) =>
-        d.referenceNode?.tagName === "div" &&
-        d.referenceNode?.attributeAnalytic["id"]?.actualValue === "main",
+      const appShrunk = findOne(
+        diffs,
+        "shape",
+        "SHRUNK",
+        (d) =>
+          d.referenceNode?.tagName === "div" &&
+          d.referenceNode?.attributeAnalytic["id"]?.actualValue === "main",
       );
       expect(appShrunk).toBeDefined();
       expect(appShrunk!.referenceNode!.childCount).toBe(10);

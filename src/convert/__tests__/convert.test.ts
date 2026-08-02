@@ -1,14 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { ContextConverter } from "../convert";
-import type { HTMLNode } from "../../types";
+import type { HTMLNode } from "@types";
 
 // ── Helper ────────────────────────────────────────────────────────────
 
 /** Minimal leaf HTMLNode factory. */
-function leaf(
-  tagName: string,
-  overrides: Partial<HTMLNode> = {},
-): HTMLNode {
+function leaf(tagName: string, overrides: Partial<HTMLNode> = {}): HTMLNode {
   return {
     type: "tag",
     tagName,
@@ -56,9 +53,7 @@ describe("ContextConverter", () => {
 
   describe("counter-based IDs", () => {
     it("assigns sequential IDs in pre-order DFS", () => {
-      const tree = converter.convert(
-        parent("div", [leaf("a"), leaf("b")]),
-      );
+      const tree = converter.convert(parent("div", [leaf("a"), leaf("b")]));
       const ids = tree.nodes().map((n) => n.id);
       expect(ids).toEqual(["0", "1", "2"]);
     });
@@ -73,10 +68,7 @@ describe("ContextConverter", () => {
   describe("passingId", () => {
     it("uses passingId instead of counter when defined", () => {
       const tree = converter.convert(
-        parent("div", [
-          leaf("a", { passingId: "alpha" }),
-          leaf("b"),
-        ]),
+        parent("div", [leaf("a", { passingId: "alpha" }), leaf("b")]),
       );
       const ids = tree.nodes().map((n) => n.id);
       // root=0, a=alpha (counter stays at 1), b=1
@@ -86,11 +78,7 @@ describe("ContextConverter", () => {
     it("skips counter values that collide with passingIds", () => {
       // passingId "1" is reserved → counter must skip from 1 to 2
       const tree = converter.convert(
-        parent("div", [
-          leaf("a", { passingId: "1" }),
-          leaf("b"),
-          leaf("c"),
-        ]),
+        parent("div", [leaf("a", { passingId: "1" }), leaf("b"), leaf("c")]),
       );
       const ids = tree.nodes().map((n) => n.id);
       // root=0, a="1" (reserved), b: counter=1 → collides → skip to 2, c=3
@@ -117,9 +105,7 @@ describe("ContextConverter", () => {
 
   it("computes depth correctly", () => {
     const tree = converter.convert(
-      parent("div", [
-        parent("section", [leaf("p")]),
-      ]),
+      parent("div", [parent("section", [leaf("p")])]),
     );
     const depths = tree.nodes().map((n) => [n.tagName, n.depth]);
     expect(depths).toEqual([
@@ -137,10 +123,7 @@ describe("ContextConverter", () => {
     //   │  └─ b (height 0)
     //   └─ c (height 0)
     const tree = converter.convert(
-      parent("div", [
-        parent("a", [leaf("b")]),
-        leaf("c"),
-      ]),
+      parent("div", [parent("a", [leaf("b")]), leaf("c")]),
     );
     const heights = tree.nodes().map((n) => [n.tagName, n.height]);
     expect(heights).toEqual([

@@ -1,4 +1,4 @@
-import type { ContextNode, ContextTree } from "../convert/context";
+import type { ContextNode, ContextTree } from "@convert/context";
 import type { CompareRule } from "./rule";
 
 /**

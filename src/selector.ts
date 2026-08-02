@@ -1,4 +1,4 @@
-import type { ContextNode } from "./convert/context";
+import type { ContextNode } from "@convert/context";
 // Note: type-only import — no circular dependency at runtime.
 
 export type SelectorSuggestion = {

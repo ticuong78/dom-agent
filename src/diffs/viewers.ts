@@ -4,11 +4,10 @@ import {
   type Comparer,
   RuleBasedComparer,
   type GroupKeyFn,
-  type ComparePair,
 } from "../compare/comparer";
 import { CompareRule } from "../compare/rule";
 import type { ContextTree, ContextNode, ValueType } from "../convert/context";
-import { DiffPoint, type DiffType } from "./points";
+import { DiffPoint, DiffResult, type DiffType } from "./points";
 
 export type TreeHierarchyDiffType = DiffType | "REORDERED" | "REPARENTED";
 
@@ -349,6 +348,7 @@ export class CompositeDiffViewer<
     // Deduplicate by (type, refId, tarId)
     const seen = new Set<string>();
     const deduped: DiffPoint<T>[] = [];
+    const result = new DiffResult<T>();
 
     for (const point of all) {
       const key = `${point.type}|${point.referenceNode?.id ?? ""}|${point.targetNode?.id ?? ""}`;

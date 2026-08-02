@@ -1,6 +1,6 @@
 import { ContextNode, ContextTree } from "./context";
-import type { HTMLNode } from "../types";
-import { defaultHash, type HashFn } from "../utils";
+import type { HTMLNode } from "@types";
+import { defaultHash, type HashFn } from "@utils";
 
 type ParentSurface = {
   tagName: string;
@@ -85,6 +85,7 @@ export class ContextConverter {
     if (currentNode.type !== "tag")
       throw new Error("Does not support parse any element but tag.");
 
+    // prior passingId from HTMLNode
     const id = currentNode.passingId ?? this._nextCounterId();
 
     // Count attributes directly — avoids calling analyzeAttributes() twice

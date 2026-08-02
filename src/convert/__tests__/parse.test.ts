@@ -1,7 +1,7 @@
 import * as cheerio from "cheerio";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { CheerioParser } from "../parse";
-import type { HTMLNode, Profile } from "../../types";
+import { CheerioParser } from "@convert/parse";
+import type { HTMLNode, Profile } from "@types";
 
 // ── Types ──────────────────────────────────────────────────────────────
 

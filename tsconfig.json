@@ -2,6 +2,7 @@
   "compilerOptions": {
     "rootDir": ".",
     "outDir": "./dist",
+    "baseUrl": "./",
     "module": "esnext",
     "moduleResolution": "bundler",
     "target": "esnext",
@@ -18,8 +19,18 @@
     "skipLibCheck": true,
     "verbatimModuleSyntax": true,
     "noUncheckedSideEffectImports": true,
-    "ignoreDeprecations": "6.0"
+    "ignoreDeprecations": "6.0",
+    "paths": {
+      // "@": ["src/*"],
+      "@types": ["src/types.ts"],
+      "@utils": ["src/utils.ts"],
+      "@selector": ["src/selector.ts"],
+      "@convert/*": ["src/convert/*"],
+      "@compare/*": ["src/compare/*"],
+      "@diffs/*": ["src/diffs/*"],
+      "@interface/*": ["src/interface/*"]
+    }
   },
-  "include": ["src/**/*", "examples/**/*"],
+  "include": ["src/**/*", "examples/**/*", "__tests__/e2e.test.ts"],
   "exclude": ["dist", "node_modules"]
 }

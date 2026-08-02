@@ -1,16 +1,16 @@
-import { ContextConverter } from "./convert/convert";
-import { CheerioParser } from "./convert/parse";
-import type { DiffPoint } from "./diffs/points";
+import { ContextConverter } from "@convert/convert";
+import { CheerioParser } from "@convert/parse";
+import type { DiffPoint } from "@diffs/points";
 import {
   CompositeDiffViewer,
   NodeMutationDiffViewer,
   SubtreeShapeDiffViewer,
   TreeHierarchyDiffViewer,
   type StandardDiffType,
-} from "./diffs/viewers";
-import type { Profile } from "./types";
+} from "@diffs/viewers";
+import type { Profile } from "@types";
 
-export type { SelectorSuggestion } from "./selector";
+export type { SelectorSuggestion } from "@selector";
 export type DiffViewerTypes = "mutation" | "hierarchy" | "shape";
 
 export function diff({
