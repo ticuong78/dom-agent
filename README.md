@@ -16,15 +16,15 @@
 
 ---
 
-## What's New in v2.0.0
+## What's New in v4.0.0
 
-- **`CompositeDiffViewer`** — runs the three built-in viewers over the same tree pair and reconciles their outputs with a single rule: "matched beats unmatched." Drops contradictory `ADDED`/`DELETED` that another viewer has already paired, deduplicates the rest, and preserves each child's `source` stamp. Empirically reduces noise by ~75% on real DOM diffs without losing signal.
-- **Viewer self-ownership.** Each built-in viewer ships with its own canonical matching rule (`DEFAULT_RULE` static). `new NodeMutationDiffViewer()` is now enough to detect mutations — the class owns its semantics. No more wiring up `CompareRule`s by hand for every viewer.
-- **`source` field on every `DiffPoint`.** Optional string stamped by the emitting viewer (`"hierarchy"`, `"mutation"`, `"shape"`, or whatever name you pass). Survives composition — you can always trace a diff back to the leaf viewer that produced it. Serialized into `DiffPointSnapshot`.
-- **`StandardDiffType` union.** `TreeHierarchyDiffType | NodeMutationDiffType | SubtreeShapeDiffType` exported for callers composing the standard trio.
-- **Fail-loud `RuleBasedComparer`.** Calling `compare()` before setting a rule now throws with a clear remediation message instead of silently returning empty pairs.
+- **`diff()` function.** Single entry point — pass two HTML strings, get back a deduplicated `DiffPoint[]`. No more manual pipeline wiring.
+- **Selector suggestion.** Every `ContextNode` can suggest a CSS selector via `node.suggestSelector()`. Confidence is data-driven: an `AttributePool` counts how many times each `attr=value` appears across the tree, so `id="search"` that appears twice scores 0.5, not a hardcoded 0.8. Selectors always include `:nth-child()` for disambiguation.
+- **Flat architecture.** The hexagonal `core/` → `implementation/` → `adapters/` layers are collapsed into `convert/`, `compare/`, `diffs/`, `selector.ts`. Fewer files, same separation of concerns.
+- **Single `AbstractDiffViewer` base class.** Subclasses implement only `classifyPair()` — the compare → classify → ADDED/DELETED → stamp flow lives in the base.
+- **Element exclusion.** Pass `exclude: [".ad-banner", "#cookie-popup"]` to `diff()` to ignore elements during comparison.
 
-See the [migration notes](#migration-from-v1x) at the bottom for breaking-change details.
+See [CHANGELOG.md](./CHANGELOG.md) for full breaking-change details.
 
 ---
 
@@ -59,38 +59,23 @@ yarn add @ticuong78/dom-agent
 ## Quick Start
 
 ```typescript
-import {
-  CheerioAdapter,
-  SHA256HashAdapter,
-  UUIDAdapter,
-  HTMLToContextConverter,
-  TreeHierarchyDiffViewer,
-  NodeMutationDiffViewer,
-  SubtreeShapeDiffViewer,
-  CompositeDiffViewer,
-  type StandardDiffType,
-} from "@ticuong78/dom-agent";
+import { diff } from "@ticuong78/dom-agent";
 
-// 1. Parse two HTML snapshots into ContextTrees
-const adapter = new CheerioAdapter();
-const converter = new HTMLToContextConverter(); // UUIDAdapter + SHA256HashAdapter by default
-const tree1 = converter.convert(adapter.parse(htmlBefore)!)!;
-const tree2 = converter.convert(adapter.parse(htmlAfter)!)!;
+const diffs = diff({
+  first: htmlBefore,
+  second: htmlAfter,
+});
 
-// 2. Compose the three built-in viewers — each owns its canonical rule
-const composite = new CompositeDiffViewer<StandardDiffType>([
-  new TreeHierarchyDiffViewer(),
-  new NodeMutationDiffViewer(),
-  new SubtreeShapeDiffViewer(),
-]);
-
-// 3. Detect changes — output is deduplicated and free of viewer contradictions
-const diffs = composite.highlight(tree1, tree2);
-
-for (const diff of diffs) {
+for (const d of diffs) {
   console.log(
-    `[${diff.source}] ${diff.type}: ${diff.referenceNode?.tagName ?? "—"} -> ${diff.targetNode?.tagName ?? "—"}`,
+    `[${d.source}] ${d.type}: ${d.referenceNode?.tagName ?? "—"} → ${d.targetNode?.tagName ?? "—"}`,
   );
+
+  // Suggest a new CSS selector for changed nodes
+  const suggestion = d.targetNode?.suggestSelector();
+  if (suggestion) {
+    console.log(`  → suggested: ${suggestion.selector} (confidence: ${suggestion.confidence})`);
+  }
 }
 ```
 
@@ -100,15 +85,16 @@ Need finer control? Each viewer accepts an optional custom `Comparer`. See [Powe
 
 ## Architecture
 
-dom-agent follows a hexagonal (ports-and-adapters) architecture:
+dom-agent follows a pipeline architecture:
 
 ```
- core/               Interfaces, types, contracts
- implementation/     Concrete strategies
- adapters/           Third-party wrappers (Cheerio, SHA-256, UUID)
+ convert/            Parse HTML → enrich into ContextNode / ContextTree
+ compare/            Match nodes across two trees using configurable rules
+ diffs/              Classify matched pairs into diff types
+ selector.ts         Suggest CSS selectors for changed nodes
 ```
 
-Each layer depends only on the one above it. Swap Cheerio for JSDOM, SHA-256 for xxHash, UUID for nanoid — the core never knows.
+Each stage depends only on the one before it. The `diff()` function orchestrates the full pipeline.
 
 ## Core Concepts
 
@@ -123,6 +109,7 @@ Every HTML element becomes a `ContextNode` with decomposed scalar properties:
 | **Positioning** | `depth`, `nthChild`, `siblingCount`                    | Where the node _sits_       |
 | **Text**        | `directText`, `directTextHash`                         | The node's own text content |
 | **Parent**      | `parentTagName`, `parentAttributeCount`, `parentDepth` | Parent identity, propagated |
+| **Selector**    | `selectorScore`, `bestAttr`                            | How uniquely identifiable   |
 
 Instead of comparing two opaque hashes, dom-agent compares individual fields — when a match fails, you know exactly which property diverged.
 
@@ -138,7 +125,7 @@ The atomic unit of diff output:
 | `referenceParentNode` | Parent of the reference node (relevant for hierarchy diffs)      |
 | `targetParentNode`    | Parent of the target node (relevant for hierarchy diffs)         |
 | `delta`               | Optional numeric quantity (e.g. number of children gained)       |
-| `source`              | **New in v2.** Name of the producing viewer (e.g. `"hierarchy"`) |
+| `source`              | Name of the producing viewer (e.g. `"hierarchy"`) |
 
 The `source` field lets you trace every diff back to the leaf viewer that produced it — invaluable when reading composite output or building viewer-specific filters downstream.
 
@@ -163,7 +150,7 @@ The `values_match` mode is the recommended baseline: a node gaining `data-verifi
 
 ### DiffViewers
 
-Three viewers, three lenses, composable results. As of v2, each viewer ships with its own canonical matching rule — you do not need to construct a `Comparer` by hand.
+Three viewers, three lenses, composable results. Each viewer ships with its own canonical matching rule — you do not need to construct a `Comparer` by hand.
 
 **TreeHierarchyDiffViewer** — structural rearrangements
 
@@ -200,27 +187,11 @@ Default rule: `tagName + attributeAnalytic values_match`.
 
 Running multiple viewers and compositing results gives richer signals than any single viewer. A node flagged as both `REPARENTED` and `ATTRIBUTE_CHANGED` tells you it moved _and_ was modified in transit.
 
-### CompositeDiffViewer (new in v2)
+### CompositeDiffViewer
 
-Composes any number of `DiffViewer`s and returns a single deduplicated `DiffPoint[]`. Implements `DiffViewer<T>` so it can be nested or used anywhere a viewer is expected.
+Composes any number of `DiffViewer`s and returns a single deduplicated `DiffPoint[]`. Implements `DiffViewer<T>` so it can be nested or used anywhere a viewer is expected. Add viewers via `registerViewers()`.
 
-**Deduplication only.** After fanning out to all child viewers, the composite collapses points sharing the same `(type, referenceNode.id, targetNode.id)` key. `ADDED` and `DELETED` survive even when the same node appears in other diff types from sibling viewers — all classifications are preserved.
-
-**What composite does NOT do:**
-
-- Resolve multi-target conflicts (two viewers pairing the same R to different targets). Both points appear; group by `referenceNode.id` to detect.
-- Suppress derived shape diffs (a `REPARENTED` widget still produces `SHRUNK`/`GROWN` on its old/new parents).
-- Merge multiple diffs about the same node into one entry.
-
-Use `StandardDiffType` when composing the built-in trio to get full type narrowing on `diff.type`:
-
-```typescript
-const composite = new CompositeDiffViewer<StandardDiffType>([
-  new TreeHierarchyDiffViewer(),
-  new NodeMutationDiffViewer(),
-  new SubtreeShapeDiffViewer(),
-]);
-```
+**Deduplication only.** After fanning out to all child viewers, the composite collapses points sharing the same `(type, referenceNode.id, targetNode.id)` key. All classifications are preserved.
 
 ### Power-user customisation
 
@@ -244,15 +215,24 @@ const viewer = new NodeMutationDiffViewer(
 const viewer2 = new NodeMutationDiffViewer(myCustomComparer);
 ```
 
-### Reporting
+### Selector Suggestion
 
-`DiffSummary` wraps a list of diff points with metadata (`reportDate`, `reportName`, `totalDiffs`). Call `serialize()` to get a JSON-safe `DiffSummarySnapshot` — all node references are flattened to primitive snapshots, safe for `JSON.stringify()` and database storage.
+Every `ContextNode` can suggest a CSS selector via `suggestSelector()`. Confidence is **data-driven**: an `AttributePool` counts how many times each `attr=value` pair appears across the tree. A `data-id="price"` that appears once scores 1.0; an `id="search"` appearing twice scores 0.5.
+
+Three strategies, chosen automatically:
+
+| Strategy | When | Example |
+| -------- | ---- | ------- |
+| `self` | Node's own attributes are unique enough | `div[data-s="price"]:nth-child(3)` |
+| `path` | An ancestor has higher confidence | `div[data-s="photos"]:nth-child(8) > img[data-id="p1"]:nth-child(1)` |
+| `root` | Nothing reliable — full positional path | `div:nth-child(1) > ul:nth-child(2) > li:nth-child(3)` |
 
 ```typescript
-const summary = new DiffSummary(diffs, "homepage-daily");
-const json = JSON.stringify(summary.serialize());
-// store / send / log as needed
+const suggestion = targetNode.suggestSelector();
+// { selector: "div[data-s='photos']:nth-child(8) > img:nth-child(1)", confidence: 0.9, strategy: "path" }
 ```
+
+Selector suggestions are a **temporary fallback** — they keep your scraper running while you review the change. They are not a permanent replacement for human-verified selectors.
 
 ---
 
@@ -261,32 +241,27 @@ const json = JSON.stringify(summary.serialize());
 ```
 dom-agent/
   src/
-    core/                       Interfaces & types only
-      compare/                  Comparer, CompareRule, CompareRuleManager
-      context/                  ContextNode, ContextTree
-      converter/                Converter interface
-      crypto/                   HashAdapter, IDAdapter
-      diff/                     DiffPoint, DiffViewer, DiffSummary
-      interface/                ISerializable
-      plain/                    HTMLNode, HTMLAdapter
+    convert/                    Parse + enrich pipeline
+      parse.ts                  CheerioParser — HTML string → HTMLNode tree
+      convert.ts                ContextConverter — HTMLNode → ContextNode
+      context.ts                ContextNode, ContextTree, AttributePool integration
+      pool.ts                   AttributePool — attr=value frequency counting
 
-    implementation/             Concrete strategies
-      compare/                  RuleBasedComparer
-      converter/                HTMLToContextConverter (default adapters)
-      diff/
-        viewer/                 AbstractDiffViewer, ComparingBasedDiffViewer,
-                                TreeHierarchy, NodeMutation, SubtreeShape,
-                                CompositeDiffViewer + StandardDiffType
+    compare/                    Node matching
+      comparer.ts               Comparer interface, RuleBasedComparer
+      rule.ts                   CompareRule, ComparePoint types
 
-    adapters/                   Third-party wrappers
-      atom/                     CheerioAdapter
-      hash/                     SHA256HashAdapter
-      id/                       UUIDAdapter
+    diffs/                      Change detection
+      points.ts                 DiffPoint, DiffType, DiffPointSnapshot
+      viewers.ts                AbstractDiffViewer, 3 concrete viewers, CompositeDiffViewer
 
-  documents/                    Pipeline docs + handoff notes for contributors
+    selector.ts                 suggestSelector() — CSS selector suggestion
+    types.ts                    HTMLNode, HTMLNodeType
+    utils.ts                    HashFn, defaultHash
+    index.ts                    Public API — diff() function
+
   examples/                     Demo scripts
   tests/                        Unit & integration tests
-  scripts/                      Build tooling
 ```
 
 ## Design Philosophy
@@ -297,46 +272,9 @@ dom-agent/
 
 **Viewers as lenses, not verdicts.** Each `DiffViewer` examines changes through one lens. None claims completeness. Compose them with `CompositeDiffViewer` for a richer picture.
 
-**Adapters as boundaries.** Every third-party dependency is isolated behind an interface. The core has zero external dependencies. Swap parsing libraries, hash functions, or ID generators without touching comparison logic.
-
 **Fail loud.** Misuse (e.g. invoking `compare()` before setting a rule) raises a clear error instead of producing junk output.
 
----
-
-## Migration from v1.x
-
-v2.0.0 is largely additive — most v1 code keeps working. Three areas need attention:
-
-**1. Custom `Comparer` implementations.** The `Comparer` interface gained two required methods: `setCompareRule(rule)` and `setGroupBy(fn)`. If you have a custom `Comparer`, add these (they can be no-ops if you don't need re-configuration).
-
-```typescript
-class MyComparer implements Comparer {
-  compare(ref, tar) { ... }
-  setCompareRule(rule: CompareRule) { /* update internal state */ }
-  setGroupBy(fn: GroupKeyFn) { /* update internal state */ }
-}
-```
-
-**2. `RuleBasedComparer.compare()` now throws when no rule is set.** Previously it silently returned an empty pairing (every node looking `ADDED`/`DELETED`). If you ever construct `new RuleBasedComparer()` without a rule, set one before calling `compare()`:
-
-```typescript
-const comparer = new RuleBasedComparer();
-comparer.setCompareRule(myRule);
-comparer.compare(t1, t2);
-```
-
-**3. Viewer construction is now simpler.** The v1 pattern of building a `CompareRule`, a `RuleBasedComparer`, and passing it into a viewer still works. But the canonical rule for each viewer now lives on the class:
-
-```typescript
-// v1 (still works)
-const comparer = new RuleBasedComparer(myRule);
-const viewer = new TreeHierarchyDiffViewer(comparer);
-
-// v2 (recommended)
-const viewer = new TreeHierarchyDiffViewer();
-```
-
-`DiffPoint` gains an optional `source` field (mutable, post-hoc). Consumers that ignore unknown fields on the snapshot are unaffected; strict JSON schema validators may need to allow it.
+**Selectors are band-aids.** `suggestSelector()` keeps your scraper alive while you fix the real problem. It is not a permanent replacement for human-verified selectors.
 
 ---
 
